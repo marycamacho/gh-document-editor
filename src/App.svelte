@@ -24,7 +24,7 @@
   } from "./lib/naming";
   import * as db from "./lib/localdb";
   import { toast } from "./lib/toast.svelte";
-  import type { AppConfig, EditSession, StaleSession } from "./lib/types";
+  import type { AppConfig, EditSession, RepoChoice, StaleSession } from "./lib/types";
 
   type Screen = "loading" | "config-error" | "first-run" | "tree" | "editor" | "submitted";
 
@@ -32,6 +32,8 @@
 
   let screen = $state<Screen>("loading");
   let config = $state<AppConfig | null>(null);
+  let currentRepo = $state<RepoChoice | null>(null);
+  let showRepoMenu = $state(false);
   let displayName = $state("");
   let configErrorMessage = $state("");
   let firstRunError = $state("");
@@ -68,7 +70,13 @@
 
   let online = $state(navigator.onLine);
 
-  const repoLabel = $derived(config ? `${config.repoOwner}/${config.repoName}` : "");
+  const repoLabel = $derived(
+    currentRepo
+      ? `${currentRepo.owner}/${currentRepo.repo}`
+      : config
+        ? `${config.repoOwner}/${config.repoName}`
+        : "",
+  );
 
   // ── Startup ────────────────────────────────────────────────
 
@@ -81,10 +89,16 @@
       screen = "config-error";
       return;
     }
-    // The Rust shell resolves the token (.env, then keychain) and connects;
-    // the token itself never reaches this side.
+    currentRepo = config.repos[0];
+    await connectCurrent();
+  }
+
+  // The Rust shell resolves the current library's token (.env, then its
+  // keychain entry) and connects; the token itself never reaches this side.
+  async function connectCurrent(): Promise<void> {
+    screen = "loading";
     try {
-      const result = await ghAuth.connect();
+      const result = await ghAuth.connect(currentRepo!);
       await afterConnect(result.login);
     } catch (e) {
       if (!isNoTokenError(e)) {
@@ -98,11 +112,30 @@
     }
   }
 
+  async function switchRepo(choice: RepoChoice): Promise<void> {
+    showRepoMenu = false;
+    if (currentRepo && choice.owner === currentRepo.owner && choice.repo === currentRepo.repo) {
+      return;
+    }
+    if (screen === "editor") {
+      toast("Finish or close your current edit before switching libraries.", "error");
+      return;
+    }
+    currentRepo = choice;
+    files = [];
+    selectedPath = null;
+    previewHtml = "";
+    staleSessions = [];
+    firstRunError = "";
+    prUrl = "";
+    await connectCurrent();
+  }
+
   async function connectWithToken(token: string, typedName: string): Promise<void> {
     connecting = true;
     firstRunError = "";
     try {
-      const result = await ghAuth.connectWithToken(token);
+      const result = await ghAuth.connectWithToken(token, currentRepo ?? undefined);
       if (!result.stored) {
         // Keychain refused — the session still works; the person re-enters next launch.
         toast("Couldn't store the token in your keychain — you may be asked again next time.", "error");
@@ -525,9 +558,40 @@
     </div>
   {/if}
 
-  {#if screen === "tree" || screen === "editor" || screen === "submitted"}
+  {#if screen === "tree" || screen === "editor" || screen === "submitted" || screen === "first-run"}
     <footer>
-      <span>{repoLabel}</span>
+      {#if config && config.repos.length > 1}
+        <div class="repo-switch">
+          {#if showRepoMenu}
+            <button
+              class="menu-backdrop"
+              aria-label="Close library menu"
+              onclick={() => (showRepoMenu = false)}
+            ></button>
+            <div class="repo-menu" role="menu">
+              {#each config.repos as r (`${r.owner}/${r.repo}`)}
+                <button class="repo-option" role="menuitem" onclick={() => void switchRepo(r)}>
+                  <span class="tick">
+                    {currentRepo && r.owner === currentRepo.owner && r.repo === currentRepo.repo
+                      ? "✓"
+                      : ""}
+                  </span>
+                  {r.owner}/{r.repo}
+                </button>
+              {/each}
+            </div>
+          {/if}
+          <button
+            class="repo-current"
+            title="Switch document library"
+            onclick={() => (showRepoMenu = !showRepoMenu)}
+          >
+            {repoLabel} ▴
+          </button>
+        </div>
+      {:else}
+        <span>{repoLabel}</span>
+      {/if}
       <span>{displayName}</span>
     </footer>
   {/if}
@@ -650,10 +714,75 @@
   footer {
     display: flex;
     justify-content: space-between;
+    align-items: center;
     padding: 6px 14px;
     border-top: 1px solid var(--border);
     font-size: 12px;
     color: var(--text-muted);
+    flex-shrink: 0;
+  }
+
+  .repo-switch {
+    position: relative;
+  }
+
+  .repo-current {
+    border: none;
+    background: none;
+    padding: 2px 6px;
+    font-size: 12px;
+    color: var(--text-muted);
+    border-radius: 6px;
+  }
+
+  .repo-current:hover {
+    color: var(--text);
+    background: var(--bg-subtle);
+  }
+
+  .menu-backdrop {
+    position: fixed;
+    inset: 0;
+    border: none;
+    background: transparent;
+    z-index: 30;
+    cursor: default;
+  }
+
+  .repo-menu {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 0;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
+    min-width: 280px;
+    padding: 4px;
+    z-index: 31;
+  }
+
+  .repo-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    text-align: left;
+    border: none;
+    background: none;
+    padding: 7px 10px;
+    font-size: 13px;
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+
+  .repo-option:hover {
+    background: var(--bg-subtle);
+  }
+
+  .tick {
+    width: 14px;
+    color: var(--accent);
     flex-shrink: 0;
   }
 </style>

@@ -1,8 +1,17 @@
+/** One selectable document library. */
+export interface RepoChoice {
+  owner: string;
+  repo: string;
+  defaultBranch: string;
+}
+
 /** Repo configuration, resolved from .env / process env by the Rust shell. */
 export interface AppConfig {
   repoOwner: string;
   repoName: string;
   defaultBranch: string;
+  /** All configured libraries, primary first — feeds the footer switcher. */
+  repos: RepoChoice[];
   /** Subtree to show; "" means the whole repo. */
   docsRoot: string;
   /** Always ends with "/". */

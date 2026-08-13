@@ -12,7 +12,7 @@ A minimal Tauri desktop app that lets non-technical team members edit and create
 - No local clone or local git. All operations go through the GitHub REST API.
 - No merge conflict resolution UI. If the file changed upstream mid-edit, warn and offer "save anyway to my branch" (safe — it's their branch) or discard.
 - No image upload, no file rename/delete.
-- No multi-repo support. One repo, set in config. (Architecture keeps owner/repo parameterized so a repo switcher is a v2 add, not a rewrite.) The two known deployments are **`cirdia-wellness/cirdia-documentation`** and **`marycamacho/writing`** — each install points at one of them via its config.
+- No arbitrary multi-repo support. The config lists the available libraries (`REPO_OWNER`/`REPO_NAME` plus the optional `REPOS` list), and the footer's library name is a click-to-switch menu across them — one active library at a time, one token per library. Adding a library is a config change, not a UI flow. The two known deployments are **`cirdia-wellness/cirdia-documentation`** and **`marycamacho/writing`**.
 - No review UI. Review happens in GitHub as normal.
 
 ---
@@ -149,7 +149,7 @@ DEFAULT_BRANCH=main
 
 ### 5.2 App config (baked in or `.env`)
 
-`REPO_OWNER`, `REPO_NAME`, `DEFAULT_BRANCH`, optional `DOCS_ROOT` (e.g. only show the `/docs` folder), optional `BRANCH_PREFIX` (default `docs/`).
+`REPO_OWNER`, `REPO_NAME`, `DEFAULT_BRANCH`, optional `DOCS_ROOT` (e.g. only show the `/docs` folder), optional `BRANCH_PREFIX` (default `docs/`), optional `REPOS` (comma-separated additional `owner/repo[@branch]` libraries for the footer switcher).
 
 Standard dotenv precedence: the `.env` file supplies values, and a real process env var overrides it. That's what the dev conveniences ride on — `npm run tauri:dev:docs` and `npm run tauri:dev:writing` launch against `cirdia-wellness/cirdia-documentation` and `marycamacho/writing` without touching the `.env`.
 
@@ -224,7 +224,7 @@ sync when either changes.*
 ## 7. Screens
 
 1. **First run** — token paste + validate, display name field, "Connect" button.
-2. **Tree view** — sidebar of folders/files (only `.md`, only under `DOCS_ROOT`) with a **+ New document** button at top; main pane shows rendered preview of selected file; **Edit** button top-right. Small footer: connected repo + display name.
+2. **Tree view** — sidebar of folders/files (only `.md`, only under `DOCS_ROOT`) with a **+ New document** button at top; main pane shows rendered preview of selected file; **Edit** button top-right. Small footer: connected repo + display name. When `REPOS` lists more than one library, the footer's repo name is a **click-to-switch menu**; switching reconnects with that library's own token (asking for it on first use) and is blocked mid-edit.
 2a. **New document dialog** — Title field, folder dropdown (existing folders under `DOCS_ROOT` only — no new-folder creation in v1), live filename preview, duplicate warning, Create/Cancel.
 3. **Editor** — CodeMirror source editing; toolbar: **Write / Split / Preview** view switch (HackMD-style; Split shows source and live rendered preview side by side; the choice persists across sessions), **Save**, **Close & Submit**, **Close without saving** (label switches to "Discard" and greys out after first save); dirty-state indicator; last-saved timestamp.
 4. **Submitted** — checkmark, PR link, "Back to documents" button.

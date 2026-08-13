@@ -43,6 +43,8 @@
     display: flex;
     flex-direction: column;
     min-width: 0;
+    /* Without this the pane grows past the window and nothing can scroll. */
+    min-height: 0;
   }
 
   header {

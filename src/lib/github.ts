@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { StaleSession } from "./types";
+import type { RepoChoice, StaleSession } from "./types";
 
 /**
  * Typed wrappers over the Rust GitHub client (src-tauri/src/github.rs).
@@ -18,11 +18,18 @@ export function isNoTokenError(e: unknown): boolean {
   return (e as { kind?: string } | null)?.kind === "no-token";
 }
 
+const repoArgs = (r?: RepoChoice) =>
+  r ? { owner: r.owner, repo: r.repo, defaultBranch: r.defaultBranch } : {};
+
 export const session = {
-  /** Connect with the .env or keychain token; rejects with kind "no-token" when there is none. */
-  connect: () => invoke<ConnectResult>("session_connect"),
-  /** First-run: validate a pasted token, keep it in the keychain, connect. */
-  connectWithToken: (token: string) => invoke<ConnectResult>("session_connect_token", { token }),
+  /**
+   * Connect to a library with its .env or keychain token; rejects with kind
+   * "no-token" when neither works. Omitting the choice uses the configured default.
+   */
+  connect: (r?: RepoChoice) => invoke<ConnectResult>("session_connect", repoArgs(r)),
+  /** First-run (once per library): validate a pasted token, keep it in the keychain, connect. */
+  connectWithToken: (token: string, r?: RepoChoice) =>
+    invoke<ConnectResult>("session_connect_token", { token, ...repoArgs(r) }),
 };
 
 export const gh = {

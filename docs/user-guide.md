@@ -103,6 +103,9 @@ on the `DISPLAY_NAME` line, done.
 - When you're happy, click **Close & Submit** — your changes go in for review, and you'll get a
   link to follow along.
 - Closed the app mid-edit? On next launch it offers to pick up where you left off.
+- If your team uses more than one document library, click the **library name in the bottom-left
+  corner** to switch. The first time you open a library it asks for that library's token (step 1
+  above, once per library).
 - Your typed text is never lost: it's kept locally even if the app crashes or you go offline.
 
 Questions or stuck? Ask Mary.

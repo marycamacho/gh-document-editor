@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ConfigError, parseConfig } from "./config";
+import { ConfigError, parseConfig, parseRepoList } from "./config";
 
 const base = {
   REPO_OWNER: "cirdia-wellness",
@@ -47,5 +47,38 @@ describe("parseConfig", () => {
   it("trims whitespace", () => {
     const c = parseConfig({ ...base, DISPLAY_NAME: "  Ana  " });
     expect(c.displayName).toBe("Ana");
+  });
+
+  it("always lists the primary repo, plus any REPOS entries", () => {
+    const c = parseConfig({
+      ...base,
+      REPOS: "marycamacho/writing, cirdia-wellness/cirdia-documentation",
+    });
+    expect(c.repos).toEqual([
+      { owner: "cirdia-wellness", repo: "cirdia-documentation", defaultBranch: "main" },
+      { owner: "marycamacho", repo: "writing", defaultBranch: "main" },
+    ]);
+  });
+});
+
+describe("parseRepoList", () => {
+  const primary = { owner: "o", repo: "r", defaultBranch: "main" };
+
+  it("returns just the primary when the list is empty", () => {
+    expect(parseRepoList("", primary)).toEqual([primary]);
+  });
+
+  it("parses owner/repo entries with optional @branch", () => {
+    const repos = parseRepoList("a/b, c/d@trunk", primary);
+    expect(repos).toEqual([
+      primary,
+      { owner: "a", repo: "b", defaultBranch: "main" },
+      { owner: "c", repo: "d", defaultBranch: "trunk" },
+    ]);
+  });
+
+  it("drops duplicates of the primary and malformed entries", () => {
+    const repos = parseRepoList("o/r, nonsense, /missing, x/", primary);
+    expect(repos).toEqual([primary]);
   });
 });

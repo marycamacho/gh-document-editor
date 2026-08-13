@@ -34,6 +34,8 @@
   } = $props();
 
   let editorEl: HTMLElement;
+  let previewEl = $state<HTMLElement | null>(null);
+  let view: EditorView | undefined;
   // svelte-ignore state_referenced_locally — CodeMirror owns the doc after mount; App remounts per session
   let current = $state(initialContent);
 
@@ -61,8 +63,24 @@
   const previewHtml = $derived(showPreview ? renderMarkdown(current) : "");
   const busy = $derived(saving || submitting);
 
+  // Split mode: keep the two panes at the same proportional position, in both
+  // directions. The guard stops the panes from ping-ponging each other.
+  let syncing = false;
+
+  function syncScroll(source: HTMLElement, target: HTMLElement) {
+    if (syncing) return;
+    syncing = true;
+    const ratio = source.scrollTop / Math.max(1, source.scrollHeight - source.clientHeight);
+    target.scrollTop = ratio * (target.scrollHeight - target.clientHeight);
+    requestAnimationFrame(() => (syncing = false));
+  }
+
+  function onPreviewScroll() {
+    if (viewMode === "split" && view && previewEl) syncScroll(previewEl, view.scrollDOM);
+  }
+
   $effect(() => {
-    const view = new EditorView({
+    const v = new EditorView({
       doc: initialContent,
       extensions: [
         basicSetup,
@@ -77,8 +95,15 @@
       ],
       parent: editorEl,
     });
-    view.focus();
-    return () => view.destroy();
+    view = v;
+    v.scrollDOM.addEventListener("scroll", () => {
+      if (viewMode === "split" && previewEl) syncScroll(v.scrollDOM, previewEl);
+    });
+    v.focus();
+    return () => {
+      view = undefined;
+      v.destroy();
+    };
   });
 
   function onkeydown(e: KeyboardEvent) {
@@ -140,7 +165,7 @@
     <!-- CodeMirror stays mounted across mode switches so the buffer and cursor survive. -->
     <div class="editor" class:with-preview={viewMode === "split"} bind:this={editorEl} hidden={!showEditor}></div>
     {#if showPreview}
-      <div class="preview">
+      <div class="preview" bind:this={previewEl} onscroll={onPreviewScroll}>
         <!-- sanitized in renderMarkdown -->
         <div class="markdown-body">{@html previewHtml}</div>
       </div>
@@ -154,6 +179,8 @@
     display: flex;
     flex-direction: column;
     min-width: 0;
+    /* Without this the pane grows past the window and nothing can scroll. */
+    min-height: 0;
   }
 
   header {

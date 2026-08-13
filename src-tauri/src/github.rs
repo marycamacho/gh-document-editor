@@ -157,6 +157,23 @@ fn repo_cfg() -> ApiResult<RepoCfg> {
     })
 }
 
+/// The library to connect to: an explicit choice from the in-app switcher, or
+/// the configured default when the webview passes nothing.
+fn repo_cfg_with(
+    owner: Option<String>,
+    repo: Option<String>,
+    default_branch: Option<String>,
+) -> ApiResult<RepoCfg> {
+    match (owner, repo) {
+        (Some(owner), Some(repo)) => Ok(RepoCfg {
+            owner,
+            repo,
+            default_branch: default_branch.unwrap_or_else(|| "main".into()),
+        }),
+        _ => repo_cfg(),
+    }
+}
+
 #[derive(Deserialize)]
 struct User {
     login: String,
@@ -181,28 +198,80 @@ async fn validate_and_build(token: String, cfg: RepoCfg) -> ApiResult<Session> {
 /// Connect using the .env token or the keychain. Errors with kind "no-token"
 /// when neither holds one — the frontend then shows the first-run screen.
 #[tauri::command]
-pub async fn session_connect(state: State<'_, Gh>) -> ApiResult<ConnectResult> {
-    let cfg = repo_cfg()?;
-    let env_token = config::resolve_all().get("GITHUB_TOKEN").cloned().filter(|t| {
-        let t = t.trim();
-        !t.is_empty() && !t.starts_with("TODO_")
+pub async fn session_connect(
+    state: State<'_, Gh>,
+    owner: Option<String>,
+    repo: Option<String>,
+    default_branch: Option<String>,
+) -> ApiResult<ConnectResult> {
+    let cfg = repo_cfg_with(owner, repo, default_branch)?;
+
+    // Webview reloads (dev HMR, crash recovery) re-invoke this. Reuse the live
+    // session instead of re-validating — and critically, instead of touching
+    // the keychain again, which can prompt the person on macOS.
+    if let Some(existing) = state.0.lock().await.clone() {
+        if existing.cfg.owner == cfg.owner && existing.cfg.repo == cfg.repo {
+            return Ok(ConnectResult { login: existing.login, stored: true });
+        }
+    }
+
+    // Try the .env token first; the keychain read is deliberately lazy because
+    // it can trigger a macOS permission prompt. An env token belongs to one
+    // resource owner, so it legitimately fails against the other library —
+    // the keychain entry is the per-library fallback.
+    let env_token = config::resolve_all()
+        .get("GITHUB_TOKEN")
+        .map(|t| t.trim().to_string())
+        .filter(|t| !t.is_empty() && !t.starts_with("TODO_"));
+    let mut env_err: Option<ApiError> = None;
+    if let Some(token) = env_token.clone() {
+        match validate_and_build(token, cfg.clone()).await {
+            Ok(session) => {
+                let login = session.login.clone();
+                *state.0.lock().await = Some(session);
+                return Ok(ConnectResult { login, stored: true });
+            }
+            Err(e) => env_err = Some(e),
+        }
+    }
+
+    let kc_token = keychain::stored_token(&keychain_account(&cfg)).filter(|t| {
+        // Same token as .env already failed — don't validate it twice.
+        env_token.as_deref() != Some(t.as_str())
     });
-    let token = match env_token {
-        Some(t) => t.trim().to_string(),
-        None => keychain::stored_token(&keychain_account(&cfg)).ok_or_else(ApiError::no_token)?,
-    };
-    let session = validate_and_build(token, cfg).await?;
-    let login = session.login.clone();
-    *state.0.lock().await = Some(session);
-    Ok(ConnectResult { login, stored: true })
+    if let Some(token) = kc_token {
+        match validate_and_build(token, cfg.clone()).await {
+            Ok(session) => {
+                let login = session.login.clone();
+                *state.0.lock().await = Some(session);
+                return Ok(ConnectResult { login, stored: true });
+            }
+            // This library's own stored token failing (expired/revoked) is
+            // worth surfacing as-is.
+            Err(e) => return Err(e),
+        }
+    }
+
+    // No keychain entry: a network-level env failure is worth reporting;
+    // an auth/access failure of a foreign env token just means "ask for one".
+    match env_err {
+        Some(e) if e.kind == "network" => Err(e),
+        _ => Err(ApiError::no_token()),
+    }
 }
 
-/// First-run: validate a freshly-pasted token, keep it in the keychain under
-/// this repo's entry, connect. The token comes in from the webview once and is
-/// never sent back.
+/// First-run (once per library): validate a freshly-pasted token, keep it in
+/// the keychain under this repo's entry, connect. The token comes in from the
+/// webview once and is never sent back.
 #[tauri::command]
-pub async fn session_connect_token(state: State<'_, Gh>, token: String) -> ApiResult<ConnectResult> {
-    let cfg = repo_cfg()?;
+pub async fn session_connect_token(
+    state: State<'_, Gh>,
+    token: String,
+    owner: Option<String>,
+    repo: Option<String>,
+    default_branch: Option<String>,
+) -> ApiResult<ConnectResult> {
+    let cfg = repo_cfg_with(owner, repo, default_branch)?;
     let account = keychain_account(&cfg);
     let session = validate_and_build(token.trim().to_string(), cfg).await?;
     let stored = keychain::store_token(&account, &session.token).is_ok();

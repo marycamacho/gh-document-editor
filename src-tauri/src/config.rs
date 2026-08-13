@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 /// The configuration keys the app understands. Only these are read from the
 /// environment and .env — nothing else leaks into the webview.
-const KEYS: [&str; 7] = [
+const KEYS: [&str; 8] = [
     "GITHUB_TOKEN",
     "DISPLAY_NAME",
     "REPO_OWNER",
@@ -11,6 +11,7 @@ const KEYS: [&str; 7] = [
     "DEFAULT_BRANCH",
     "DOCS_ROOT",
     "BRANCH_PREFIX",
+    "REPOS",
 ];
 
 /// Parse simple KEY=VALUE lines. Supports comments, blank lines, CRLF, and
