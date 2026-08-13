@@ -261,6 +261,6 @@ Roughly 2–3 focused days end to end.
 
 - [x] ~~**Token storage: both.** `.env` / keychain / per-repo keychain entries.~~ **Superseded 2026-08-13 (same day, after live testing):** the PAT + keychain design is replaced by **GitHub App device-flow sign-in** (§5.1, §6). Reasons: macOS keychain ACL password prompts (unfixable for unsigned dev builds), the PAT-creation burden on non-technical users, and fine-grained PATs being scoped to a single resource owner while the two libraries have different owners. The GitHub App gives one browser sign-in, non-expiring tokens (expiration disabled on the registration, matching the low-risk write-only-docs threat model), one sign-in covering all libraries, and a plain owner-only token file with zero OS prompts.
 - [x] **Target repos:** `cirdia-wellness/cirdia-documentation` and `marycamacho/writing` — one repo per install via config. `DOCS_ROOT`: whole repo (both repos hold markdown throughout, not under a single `/docs` folder).
-- [x] **Build targets:** Tauri desktop for both macOS and Windows.
+- [x] **Build targets:** Tauri desktop for macOS and Windows; Linux (AppImage/deb/rpm) added to the release matrix 2026-08-13.
 - [x] **PR reviewer:** none requested by the app. Review assignment is left to repo defaults/CODEOWNERS.
 - [x] **Token expiration: no expiration.** Now enforced structurally: user-token expiration is disabled on the GitHub App registration. Revocation (user's GitHub settings, or uninstalling the App) is the recovery path for a lost machine.

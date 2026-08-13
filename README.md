@@ -9,7 +9,7 @@ Full product and technical spec: [docs/spec.md](docs/spec.md). Setup guide to se
 
 ## Stack
 
-- **Tauri 2** desktop shell (macOS + Windows). Rust owns window management, `.env` config
+- **Tauri 2** desktop shell (macOS + Windows + Linux). Rust owns window management, `.env` config
   resolution, sign-in + token storage, and the **GitHub REST client** (reqwest) — all network
   traffic runs in the Rust layer, and the token never enters the webview.
 - **Auth:** GitHub App ("Cirdia Docs Editor") **device flow** — users approve once in the browser
@@ -54,8 +54,9 @@ Releases are built by GitHub Actions ([.github/workflows/release.yml](.github/wo
    the exact fix if something's off. (CI runs the same script plus the full test suite in a
    `verify` job before any build starts.)
 3. Tag and push: `git tag v0.1.0 && git push origin v0.1.0`.
-4. The workflow builds macOS (Apple Silicon + Intel, signed + notarized) and Windows installers
-   and attaches them to a **draft** GitHub Release — review it on the Releases page and publish.
+4. The workflow builds macOS (Apple Silicon + Intel, signed + notarized), Windows, and Linux
+   (AppImage/deb/rpm) installers and attaches them to a **draft** GitHub Release — review it on
+   the Releases page and publish.
 5. Team members download from the repo's Releases page with their GitHub account.
 
 macOS signing needs six repo secrets (listed at the top of the workflow file). To produce them:
