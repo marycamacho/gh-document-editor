@@ -50,10 +50,13 @@ npm run tauri:build # desktop bundles (macOS/Windows)
 Releases are built by GitHub Actions ([.github/workflows/release.yml](.github/workflows/release.yml)):
 
 1. Bump `version` in both `package.json` and `src-tauri/tauri.conf.json` (keep them equal), commit.
-2. Tag and push: `git tag v0.1.0 && git push origin v0.1.0`.
-3. The workflow builds macOS (Apple Silicon + Intel, signed + notarized) and Windows installers
+2. Run `npm run preflight` — checks version consistency and Tauri crate/npm alignment, and prints
+   the exact fix if something's off. (CI runs the same script plus the full test suite in a
+   `verify` job before any build starts.)
+3. Tag and push: `git tag v0.1.0 && git push origin v0.1.0`.
+4. The workflow builds macOS (Apple Silicon + Intel, signed + notarized) and Windows installers
    and attaches them to a **draft** GitHub Release — review it on the Releases page and publish.
-4. Team members download from the repo's Releases page with their GitHub account.
+5. Team members download from the repo's Releases page with their GitHub account.
 
 macOS signing needs six repo secrets (listed at the top of the workflow file). To produce them:
 export the **Developer ID Application** certificate from Keychain Access as a `.p12` with a

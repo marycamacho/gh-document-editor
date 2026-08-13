@@ -23,7 +23,41 @@ permissions:
   contents: write
 
 jobs:
+  # Fail fast, before three build runners spin up: version consistency,
+  # Tauri crate/npm alignment, and the full test suite.
+  verify:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      - name: Preflight (versions + alignment)
+        run: node scripts/preflight.mjs
+
+      - name: Frontend tests
+        run: npm run test:run
+
+      - name: Type check
+        run: npm run check
+
+      - name: Rust tests
+        run: cargo test
+        working-directory: src-tauri
+
   build:
+    needs: verify
     strategy:
       fail-fast: false
       matrix:

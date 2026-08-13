@@ -11,6 +11,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:all": "npm run test:run && cd src-tauri && cargo test",
+    "preflight": "node scripts/preflight.mjs",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:dev:docs": "REPO_OWNER=cirdia-wellness REPO_NAME=cirdia-documentation DEFAULT_BRANCH=main tauri dev",
