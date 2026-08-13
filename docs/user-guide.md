@@ -43,14 +43,18 @@ for each one separately and remembers them all.
 8. Click **Generate token** at the bottom.
 9. GitHub shows the token **once** — a long string starting with `github_pat_`. Click the
    **copy icon** next to it.
-10. Open the Docs Editor app and paste the token when asked. It's stored safely in your computer's
-    keychain. (Or, if your team lead set you up with the `.env` method: open the `.env` file next
-    to the app, add a line `GITHUB_TOKEN=` followed by the token, save the file.)
+10. **Save it in Bitwarden before anything else.** Open Bitwarden, add a new Login item named
+    `docs-editor` (put the token in the password field, and note which library it's for), and
+    save. GitHub never shows the token again — Bitwarden is your backup copy.
+11. Now open the Docs Editor app and paste the token when asked. It's stored safely in your
+    computer's keychain. (Or, if your team lead set you up with the `.env` method: open the `.env`
+    file next to the app, add a line `GITHUB_TOKEN=` followed by the token, save the file.)
 
-**If you lose the token or paste it wrong:** no problem — go back to step 4, delete the old token,
-and generate a new one.
+**If you paste it wrong or the app loses it:** copy it again from Bitwarden. **If it's not in
+Bitwarden either:** no problem — go back to step 4, delete the old token, and generate a new one.
 
-**Never** paste the token into chat, email, or a shared doc. It's a password.
+**Never** paste the token into chat, email, or a shared doc. It's a password — Bitwarden and the
+app are the only two places it should ever live.
 
 ---
 
