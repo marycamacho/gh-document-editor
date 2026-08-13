@@ -3,14 +3,12 @@
 Welcome! The Docs Editor lets you read, edit, and create the team's documents. Your changes go in
 for review automatically — no technical knowledge needed.
 
-Setup is two short steps, about 4 minutes total, and you only do it once:
-
-1. Sign in with your GitHub account
-2. Tell the app which document library to use
+Setup is one short step, about 2 minutes, once: sign in with your GitHub account. The app already
+knows the team's document libraries — there's nothing to configure.
 
 ---
 
-## 1. Signing in
+## Signing in
 
 **Before you start:** you need a GitHub account, and the team lead must have given it access to
 the documents. If you can open the repo page your team lead sent you (e.g.
@@ -36,41 +34,8 @@ sign-in lives safely on your computer, and it can be turned off any time from yo
 **If the browser says the code expired:** codes are only valid for a few minutes — go back to the
 app and click the sign-in button again for a fresh one.
 
----
-
-## 2. Telling the app which document library to use
-
-**What you're doing:** pointing the Docs Editor at the team's document library. Takes 2 minutes,
-once.
-
-The app looks for a settings file called `.env` in the same folder as the app. Your team lead will
-send you a ready-made copy, or you can make one yourself:
-
-1. Find the file **`.env.example`** in the app folder (it came with the app).
-2. Make a copy of it and rename the copy to exactly **`.env`** — just those four characters,
-   nothing before the dot.
-   - *Mac tip:* Finder may warn about names starting with a dot; click "Use ." to confirm.
-   - *Windows tip:* make sure it isn't secretly named `.env.txt` — turn on "File name extensions"
-     in the File Explorer View menu to check.
-3. Open `.env` in any text editor (TextEdit, Notepad — not Word).
-4. Fill in your name where it says `DISPLAY_NAME=` (e.g. `DISPLAY_NAME=Ana`).
-5. Check the repo lines match what your team lead told you:
-   ```
-   REPO_OWNER=cirdia-wellness
-   REPO_NAME=cirdia-documentation
-   DEFAULT_BRANCH=main
-   ```
-   These say *whose* library (`REPO_OWNER`), *which* library (`REPO_NAME`), and which version of it
-   counts as the published one (`DEFAULT_BRANCH` — almost always `main`). If Mary sent you these
-   values, copy them exactly. Don't guess.
-6. Save the file and launch the app. If the footer of the app shows the repo name and your name,
-   it worked.
-
-**If the app says it can't find the repo:** the three repo lines don't match a real repo, or you
-haven't been given access yet — ask your team lead to check both.
-
-**If your team lead sent you a pre-filled `.env`:** just drop it into the app folder, add your name
-on the `DISPLAY_NAME` line, done.
+**If the app says it can't reach the document library:** your GitHub account hasn't been given
+access yet — ask your team lead to add you.
 
 ---
 

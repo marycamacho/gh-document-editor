@@ -32,9 +32,9 @@ npm run tauri:dev:writing    # marycamacho/writing
 ```
 
 On first launch the app shows "Sign in with GitHub": a short code, approved once in the browser.
-Repo configuration comes from a `.env` file — copy `.env.example` to `.env` next to the app (repo
-root in dev) and fill it in. For dev, a `GITHUB_TOKEN` in `.env` bypasses sign-in entirely, and
-`GITHUB_APP_CLIENT_ID` overrides the baked-in App registration.
+The team's libraries are baked in (`src-tauri/src/config.rs` `DEFAULTS`) — no configuration
+needed. An optional `.env` (repo root in dev; see `.env.example`) overrides the defaults: point
+at other repos, bypass sign-in with a `GITHUB_TOKEN`, or test another `GITHUB_APP_CLIENT_ID`.
 
 ## Develop
 

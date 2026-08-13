@@ -18,11 +18,12 @@ export function parseConfig(raw: Record<string, string>): AppConfig {
 
   const repoOwner = get("REPO_OWNER");
   const repoName = get("REPO_NAME");
+  // Unreachable in normal use — the libraries are baked into the app
+  // (src-tauri/src/config.rs DEFAULTS); only a broken dev override gets here.
   if (!repoOwner || !repoName) {
     throw new ConfigError(
-      "The app doesn't know which document library to open. " +
-        "Check that the .env file next to the app has REPO_OWNER and REPO_NAME filled in — " +
-        "your team lead can send you a ready-made copy.",
+      "The app's library configuration is broken — a .env override next to the app is " +
+        "clearing REPO_OWNER or REPO_NAME. Remove or fix that file and relaunch.",
     );
   }
 

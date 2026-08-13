@@ -15,9 +15,9 @@ describe("parseConfig", () => {
     expect(c.displayName).toBe("");
   });
 
-  it("throws a person-readable error when the repo is not configured", () => {
+  it("throws a readable error when an override clears the repo config", () => {
     expect(() => parseConfig({})).toThrow(ConfigError);
-    expect(() => parseConfig({ REPO_OWNER: "x" })).toThrow(/document library/);
+    expect(() => parseConfig({ REPO_OWNER: "x" })).toThrow(/\.env override/);
   });
 
   it("treats .env.example placeholders as absent", () => {

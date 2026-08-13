@@ -1,6 +1,18 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+/// Baked-in defaults: the libraries this app exists to edit. The GitHub App
+/// ("Cirdia Docs Editor") is installed on exactly these repos, so they are a
+/// fact about the product, not per-user configuration — a fresh install works
+/// with no .env at all (config-as-code). A .env or process env var overrides
+/// them for dev or unusual setups.
+const DEFAULTS: [(&str, &str); 4] = [
+    ("REPO_OWNER", "cirdia-wellness"),
+    ("REPO_NAME", "cirdia-documentation"),
+    ("DEFAULT_BRANCH", "main"),
+    ("REPOS", "marycamacho/writing"),
+];
+
 /// The configuration keys the app understands. Only these are read from the
 /// environment and .env — nothing else leaks into the webview.
 const KEYS: [&str; 9] = [
@@ -70,11 +82,13 @@ fn candidate_paths() -> Vec<PathBuf> {
 /// which is what lets `REPO_OWNER=x REPO_NAME=y npm run tauri:dev` target a
 /// different repo without touching the file.
 pub fn resolve_all() -> HashMap<String, String> {
-    let mut map = HashMap::new();
+    let mut map: HashMap<String, String> =
+        DEFAULTS.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect();
     for path in candidate_paths() {
         if let Ok(content) = std::fs::read_to_string(&path) {
             for (key, value) in parse_env(&content) {
-                if KEYS.contains(&key.as_str()) {
+                // Empty override values never blank out a baked default.
+                if KEYS.contains(&key.as_str()) && !value.trim().is_empty() {
                     map.insert(key, value);
                 }
             }

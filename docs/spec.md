@@ -12,7 +12,7 @@ A minimal Tauri desktop app that lets non-technical team members edit and create
 - No local clone or local git. All operations go through the GitHub REST API.
 - No merge conflict resolution UI. If the file changed upstream mid-edit, warn and offer "save anyway to my branch" (safe — it's their branch) or discard.
 - No image upload, no file rename/delete.
-- No arbitrary multi-repo support. The config lists the available libraries (`REPO_OWNER`/`REPO_NAME` plus the optional `REPOS` list), and the footer's library name is a click-to-switch menu across them — one active library at a time, one sign-in covering all of them. Adding a library is a config change, not a UI flow. The two known deployments are **`cirdia-wellness/cirdia-documentation`** and **`marycamacho/writing`**.
+- No arbitrary multi-repo support. The available libraries are baked into the app (§5.1) — **`cirdia-wellness/cirdia-documentation`** and **`marycamacho/writing`** — and the footer's library name is a click-to-switch menu across them: one active library at a time, one sign-in covering all of them. Adding a library is a code change plus a GitHub App install, not a UI flow.
 - No review UI. Review happens in GitHub as normal.
 
 ---
@@ -78,7 +78,7 @@ Edge: person closes the window after commits but before submitting
 | Merge strategy | Whatever the repo default is; multi-commit PRs are fine | — |
 
 `<file-slug>` = filename lowercased, extension dropped, non-alphanumerics → `-`.
-`<name>` comes from `DISPLAY_NAME` in `.env` (fall back to the signed-in GitHub login).
+`<name>` is asked for on the sign-in screen (fall back to the signed-in GitHub login; `DISPLAY_NAME` in a dev `.env` overrides).
 Timestamps in the person's local timezone.
 
 ---
@@ -126,37 +126,15 @@ Note on `PUT /contents`: each save must send the *current* blob `sha` of the fil
 
 ## 5. Configuration
 
-### 5.1 `.env` template (ship this file as `.env.example`)
+### 5.1 Zero user configuration (config-as-code)
 
-```bash
-# ── Docs Editor configuration ──────────────────────────────
-# Copy this file to `.env` in the same folder as the app,
-# fill in your name, save. That's it.
-#
-# Signing in happens inside the app (Sign in with GitHub) —
-# there are no tokens or passwords in this file.
+**Users configure nothing.** The libraries are a fact about the product — the GitHub App is installed on exactly these repos — so they are **baked into the app** (`src-tauri/src/config.rs` `DEFAULTS`): `cirdia-wellness/cirdia-documentation` as the primary, `marycamacho/writing` in the switcher, branch `main`, prefix `docs/`. A fresh install's first screen is the sign-in, and the GitHub App installation, not config, is the real access boundary. Adding a library later = install the App on it + one line in `DEFAULTS`.
 
-# Your name as it should appear in edit history (e.g. "Ana")
-DISPLAY_NAME=TODO_your_first_name
+**Auth decision (supersedes the PAT/keychain design):** sign-in is a **GitHub App device flow**. On launch the app connects with the stored sign-in; with none stored it shows the sign-in screen (name + "Sign in with GitHub" → short code → browser approval). The resulting non-expiring user token is written to an owner-only `auth.json` in the app data dir.
 
-# ── Set by the team lead — do not change ───────────────────
-# (example shown for the Cirdia documentation library; the writing
-#  library uses REPO_OWNER=marycamacho / REPO_NAME=writing)
-REPO_OWNER=cirdia-wellness
-REPO_NAME=cirdia-documentation
-DEFAULT_BRANCH=main
+### 5.2 Developer overrides (`.env`, optional)
 
-# Optional: more libraries for the in-app switcher
-#REPOS=marycamacho/writing
-```
-
-**Auth decision (supersedes the PAT/keychain design):** sign-in is a **GitHub App device flow**. On launch the app connects with the stored sign-in; with none stored it shows the sign-in screen (name + "Sign in with GitHub" → short code → browser approval). The resulting non-expiring user token is written to an owner-only `auth.json` in the app data dir. `GITHUB_TOKEN` in `.env` survives as a dev/power-user override only — it is not part of any user's setup.
-
-### 5.2 App config (baked in or `.env`)
-
-`REPO_OWNER`, `REPO_NAME`, `DEFAULT_BRANCH`, optional `DOCS_ROOT` (e.g. only show the `/docs` folder), optional `BRANCH_PREFIX` (default `docs/`), optional `REPOS` (comma-separated additional `owner/repo[@branch]` libraries for the footer switcher).
-
-Standard dotenv precedence: the `.env` file supplies values, and a real process env var overrides it. That's what the dev conveniences ride on — `npm run tauri:dev:docs` and `npm run tauri:dev:writing` launch against `cirdia-wellness/cirdia-documentation` and `marycamacho/writing` without touching the `.env`.
+A `.env` next to the app (repo root in dev) overrides the baked defaults; a real process env var overrides the `.env`; empty values never blank a default. Keys: `REPO_OWNER`, `REPO_NAME`, `DEFAULT_BRANCH`, `DOCS_ROOT`, `BRANCH_PREFIX`, `REPOS` (`owner/repo[@branch]`, comma-separated), `DISPLAY_NAME`, `GITHUB_TOKEN` (bypass sign-in in dev), `GITHUB_APP_CLIENT_ID` (test another App registration). `.env.example` documents them. The dev conveniences ride on env precedence — `npm run tauri:dev:docs` / `tauri:dev:writing` switch targets without touching a file. End users never see any of this.
 
 ---
 
@@ -184,32 +162,9 @@ sync when either changes.*
 
 *(Infra note for Mary: the "Cirdia Docs Editor" GitHub App — owned by @marycamacho, Client ID `Iv23liW7NEzKZeoZUVa0`, baked into `src-tauri/src/auth.rs` — has device flow enabled, user-token expiration disabled, Contents + Pull requests read/write, installable on Any account, no webhook, no private key. Installed on `cirdia-wellness/cirdia-documentation` and `marycamacho/writing`. Adding a library later = install the App on that repo. Kill switches: the user revokes under Settings → Applications, or you uninstall the App from the repo.)*
 
-### 6.1 User Guide: Telling the App Which Document Library to Use (include after sign-in guide)
+### 6.1 (removed) Library configuration for users
 
-> **What you're doing:** pointing the Docs Editor at the team's document library. Takes 2 minutes, once.
->
-> The app looks for a settings file called `.env` in the same folder as the app. Your team lead will send you a ready-made copy, or you can make one yourself:
->
-> 1. Find the file **`.env.example`** in the app folder (it came with the app).
-> 2. Make a copy of it and rename the copy to exactly **`.env`** — just those four characters, nothing before the dot.
->    - *Mac tip:* Finder may warn about names starting with a dot; click "Use ." to confirm.
->    - *Windows tip:* make sure it isn't secretly named `.env.txt` — turn on "File name extensions" in the File Explorer View menu to check.
-> 3. Open `.env` in any text editor (TextEdit, Notepad — not Word).
-> 4. Fill in your name where it says `DISPLAY_NAME=` (e.g. `DISPLAY_NAME=Ana`).
-> 5. Check the repo lines match what your team lead told you:
->    ```
->    REPO_OWNER=cirdia-wellness
->    REPO_NAME=cirdia-documentation
->    DEFAULT_BRANCH=main
->    ```
->    These say *whose* library (`REPO_OWNER`), *which* library (`REPO_NAME`), and which version of it counts as the published one (`DEFAULT_BRANCH` — almost always `main`). If Mary sent you these values, copy them exactly. Don't guess.
-> 6. Save the file and launch the app. If the footer of the app shows the repo name and your name, it worked.
->
-> **If the app says it can't find the repo:** the three repo lines don't match a real repo, or you haven't been given access yet — ask your team lead to check both.
->
-> **If your team lead sent you a pre-filled `.env`:** just drop it into the app folder, add your name on the `DISPLAY_NAME` line, done.
-
-*(Note for Mary: the simplest rollout is to ship each person a pre-filled `.env` with everything but `DISPLAY_NAME` set — then their entire setup is: sign in + one name field.)*
+Gone by design — users configure nothing (§5.1). The app ships knowing its libraries; the only per-user input is their name, asked on the sign-in screen.
 
 ---
 
