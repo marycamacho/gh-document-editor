@@ -165,6 +165,8 @@ sync when either changes.*
 >
 > **Before you start:** you need a GitHub account and the team lead must have added you to the repo with write access. If you can open the repo page your team lead sent you (e.g. github.com/cirdia-wellness/cirdia-documentation), you're set.
 >
+> **One token per document library.** A token only works for the one library it was created for. If your team uses more than one library, repeat these steps once per library — the app asks for each one separately and remembers them all.
+>
 > 1. Go to **github.com** and sign in.
 > 2. Click your **profile photo** (top-right corner) → **Settings**.
 > 3. In the left sidebar, scroll to the bottom and click **Developer settings**.
@@ -264,7 +266,7 @@ Roughly 2–3 focused days end to end.
 
 ## 10. Decisions (resolved 2026-08-13)
 
-- [x] **Token storage: both.** `.env` if present, else keychain, else first-run paste screen → keychain (see §5.1).
+- [x] **Token storage: both.** `.env` if present, else keychain, else first-run paste screen → keychain (see §5.1). Keychain entries are **per repo** (`owner/repo`): a fine-grained PAT is scoped to a single resource owner, and the two target repos have different owners — so a person using both libraries creates one token per library, and the app keeps each under its own entry.
 - [x] **Target repos:** `cirdia-wellness/cirdia-documentation` and `marycamacho/writing` — one repo per install via config. `DOCS_ROOT`: whole repo (both repos hold markdown throughout, not under a single `/docs` folder).
 - [x] **Build targets:** Tauri desktop for both macOS and Windows.
 - [x] **PR reviewer:** none requested by the app. Review assignment is left to repo defaults/CODEOWNERS.

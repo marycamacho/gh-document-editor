@@ -19,6 +19,10 @@ team's document library. Takes about 3 minutes. You do this once.
 with write access. If you can open the repo page your team lead sent you (e.g.
 github.com/cirdia-wellness/cirdia-documentation), you're set.
 
+**One token per document library.** A token only works for the one library it was created for. If
+your team uses more than one library, you'll repeat these steps once per library — the app asks
+for each one separately and remembers them all.
+
 1. Go to **github.com** and sign in.
 2. Click your **profile photo** (top-right corner) → **Settings**.
 3. In the left sidebar, scroll to the bottom and click **Developer settings**.

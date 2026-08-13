@@ -162,8 +162,13 @@ struct User {
     login: String,
 }
 
-async fn validate_and_build(token: String) -> ApiResult<Session> {
-    let cfg = repo_cfg()?;
+/// The keychain account for a repo's token — one entry per document library,
+/// because a fine-grained PAT is scoped to a single resource owner.
+fn keychain_account(cfg: &RepoCfg) -> String {
+    format!("{}/{}", cfg.owner, cfg.repo)
+}
+
+async fn validate_and_build(token: String, cfg: RepoCfg) -> ApiResult<Session> {
     let client = reqwest::Client::new();
     let mut session = Session { token, login: String::new(), cfg, client };
     let user: User = send_json(session.req(Method::GET, "/user")).await?;
@@ -177,26 +182,30 @@ async fn validate_and_build(token: String) -> ApiResult<Session> {
 /// when neither holds one — the frontend then shows the first-run screen.
 #[tauri::command]
 pub async fn session_connect(state: State<'_, Gh>) -> ApiResult<ConnectResult> {
+    let cfg = repo_cfg()?;
     let env_token = config::resolve_all().get("GITHUB_TOKEN").cloned().filter(|t| {
         let t = t.trim();
         !t.is_empty() && !t.starts_with("TODO_")
     });
     let token = match env_token {
         Some(t) => t.trim().to_string(),
-        None => keychain::stored_token().ok_or_else(ApiError::no_token)?,
+        None => keychain::stored_token(&keychain_account(&cfg)).ok_or_else(ApiError::no_token)?,
     };
-    let session = validate_and_build(token).await?;
+    let session = validate_and_build(token, cfg).await?;
     let login = session.login.clone();
     *state.0.lock().await = Some(session);
     Ok(ConnectResult { login, stored: true })
 }
 
-/// First-run: validate a freshly-pasted token, keep it in the keychain, connect.
-/// The token comes in from the webview once and is never sent back.
+/// First-run: validate a freshly-pasted token, keep it in the keychain under
+/// this repo's entry, connect. The token comes in from the webview once and is
+/// never sent back.
 #[tauri::command]
 pub async fn session_connect_token(state: State<'_, Gh>, token: String) -> ApiResult<ConnectResult> {
-    let session = validate_and_build(token.trim().to_string()).await?;
-    let stored = keychain::store_token(&session.token).is_ok();
+    let cfg = repo_cfg()?;
+    let account = keychain_account(&cfg);
+    let session = validate_and_build(token.trim().to_string(), cfg).await?;
+    let stored = keychain::store_token(&account, &session.token).is_ok();
     let login = session.login.clone();
     *state.0.lock().await = Some(session);
     Ok(ConnectResult { login, stored })
