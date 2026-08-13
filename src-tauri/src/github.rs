@@ -8,10 +8,10 @@ use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use reqwest::{Method, RequestBuilder, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use tauri::State;
+use tauri::{AppHandle, State};
 use tokio::sync::Mutex;
 
-use crate::{config, keychain};
+use crate::{auth, config};
 
 const API: &str = "https://api.github.com";
 
@@ -29,15 +29,15 @@ pub struct ApiError {
 
 impl ApiError {
     fn no_token() -> Self {
-        Self { kind: "no-token".into(), status: None, message: "No stored token".into() }
+        Self { kind: "no-token".into(), status: None, message: "No stored sign-in".into() }
     }
-    fn network(e: impl std::fmt::Display) -> Self {
+    pub fn network(e: impl std::fmt::Display) -> Self {
         Self { kind: "network".into(), status: None, message: e.to_string() }
     }
-    fn http(status: u16, message: String) -> Self {
+    pub fn http(status: u16, message: String) -> Self {
         Self { kind: "http".into(), status: Some(status), message }
     }
-    fn state(message: &str) -> Self {
+    pub fn state(message: &str) -> Self {
         Self { kind: "state".into(), status: None, message: message.into() }
     }
 }
@@ -179,12 +179,6 @@ struct User {
     login: String,
 }
 
-/// The keychain account for a repo's token — one entry per document library,
-/// because a fine-grained PAT is scoped to a single resource owner.
-fn keychain_account(cfg: &RepoCfg) -> String {
-    format!("{}/{}", cfg.owner, cfg.repo)
-}
-
 async fn validate_and_build(token: String, cfg: RepoCfg) -> ApiResult<Session> {
     let client = reqwest::Client::new();
     let mut session = Session { token, login: String::new(), cfg, client };
@@ -199,6 +193,7 @@ async fn validate_and_build(token: String, cfg: RepoCfg) -> ApiResult<Session> {
 /// when neither holds one — the frontend then shows the first-run screen.
 #[tauri::command]
 pub async fn session_connect(
+    app: AppHandle,
     state: State<'_, Gh>,
     owner: Option<String>,
     repo: Option<String>,
@@ -206,19 +201,16 @@ pub async fn session_connect(
 ) -> ApiResult<ConnectResult> {
     let cfg = repo_cfg_with(owner, repo, default_branch)?;
 
-    // Webview reloads (dev HMR, crash recovery) re-invoke this. Reuse the live
-    // session instead of re-validating — and critically, instead of touching
-    // the keychain again, which can prompt the person on macOS.
+    // Webview reloads (dev HMR, crash recovery) re-invoke this; reuse the
+    // live session instead of re-validating.
     if let Some(existing) = state.0.lock().await.clone() {
         if existing.cfg.owner == cfg.owner && existing.cfg.repo == cfg.repo {
             return Ok(ConnectResult { login: existing.login, stored: true });
         }
     }
 
-    // Try the .env token first; the keychain read is deliberately lazy because
-    // it can trigger a macOS permission prompt. An env token belongs to one
-    // resource owner, so it legitimately fails against the other library —
-    // the keychain entry is the per-library fallback.
+    // GITHUB_TOKEN in .env is a dev/power-user override; the normal path is
+    // the device-flow token file. One sign-in covers every library.
     let env_token = config::resolve_all()
         .get("GITHUB_TOKEN")
         .map(|t| t.trim().to_string())
@@ -235,49 +227,34 @@ pub async fn session_connect(
         }
     }
 
-    let kc_token = keychain::stored_token(&keychain_account(&cfg)).filter(|t| {
+    let file_token = auth::stored_token(&app).filter(|t| {
         // Same token as .env already failed — don't validate it twice.
         env_token.as_deref() != Some(t.as_str())
     });
-    if let Some(token) = kc_token {
+    if let Some(token) = file_token {
         match validate_and_build(token, cfg.clone()).await {
             Ok(session) => {
                 let login = session.login.clone();
                 *state.0.lock().await = Some(session);
                 return Ok(ConnectResult { login, stored: true });
             }
-            // This library's own stored token failing (expired/revoked) is
-            // worth surfacing as-is.
+            // 401 means the sign-in was revoked server-side — forget the dead
+            // token and send the person back to the sign-in screen.
+            Err(e) if e.status == Some(401) => {
+                let _ = auth::auth_signout(app);
+                return Err(ApiError::no_token());
+            }
+            // Anything else (no repo access, network) is a real answer.
             Err(e) => return Err(e),
         }
     }
 
-    // No keychain entry: a network-level env failure is worth reporting;
-    // an auth/access failure of a foreign env token just means "ask for one".
+    // No stored sign-in: a network-level env failure is worth reporting;
+    // otherwise ask the person to sign in.
     match env_err {
         Some(e) if e.kind == "network" => Err(e),
         _ => Err(ApiError::no_token()),
     }
-}
-
-/// First-run (once per library): validate a freshly-pasted token, keep it in
-/// the keychain under this repo's entry, connect. The token comes in from the
-/// webview once and is never sent back.
-#[tauri::command]
-pub async fn session_connect_token(
-    state: State<'_, Gh>,
-    token: String,
-    owner: Option<String>,
-    repo: Option<String>,
-    default_branch: Option<String>,
-) -> ApiResult<ConnectResult> {
-    let cfg = repo_cfg_with(owner, repo, default_branch)?;
-    let account = keychain_account(&cfg);
-    let session = validate_and_build(token.trim().to_string(), cfg).await?;
-    let stored = keychain::store_token(&account, &session.token).is_ok();
-    let login = session.login.clone();
-    *state.0.lock().await = Some(session);
-    Ok(ConnectResult { login, stored })
 }
 
 // ── Repo operations (the API call map in docs/spec.md §4) ─────────────────

@@ -1,60 +1,40 @@
 # Docs Editor — Setup Guide
 
 Welcome! The Docs Editor lets you read, edit, and create the team's documents. Your changes go in
-for review automatically — you never need to learn git or GitHub beyond the one-time setup below.
+for review automatically — no technical knowledge needed.
 
-Setup is two short steps, about 5 minutes total, and you only do it once:
+Setup is two short steps, about 4 minutes total, and you only do it once:
 
-1. Create your personal access token (your "key" to the document library)
+1. Sign in with your GitHub account
 2. Tell the app which document library to use
 
 ---
 
-## 1. Creating your GitHub token
+## 1. Signing in
 
-**What you're doing:** creating a personal key that lets the Docs Editor save your changes to the
-team's document library. Takes about 3 minutes. You do this once.
-
-**Before you start:** you need a GitHub account and the team lead must have added you to the repo
-with write access. If you can open the repo page your team lead sent you (e.g.
+**Before you start:** you need a GitHub account, and the team lead must have given it access to
+the documents. If you can open the repo page your team lead sent you (e.g.
 github.com/cirdia-wellness/cirdia-documentation), you're set.
 
-**One token per document library.** A token only works for the one library it was created for. If
-your team uses more than one library, you'll repeat these steps once per library — the app asks
-for each one separately and remembers them all.
+1. Open the Docs Editor app.
+2. Type your name (this is how your edits are labeled — e.g. "Ana").
+3. Click **Sign in with GitHub**.
+4. The app shows a short code, something like `B4XR-9KQP`. Click the code to copy it.
+5. Click **Open GitHub in your browser**. A GitHub page appears asking for the code.
+6. Paste the code, click **Continue**, then click **Authorize**. (Sign in to github.com first if
+   the browser asks you to.)
+7. Switch back to the Docs Editor — your documents are already loading.
 
-1. Go to **github.com** and sign in.
-2. Click your **profile photo** (top-right corner) → **Settings**.
-3. In the left sidebar, scroll to the bottom and click **Developer settings**.
-4. Click **Personal access tokens** → **Fine-grained tokens**.
-5. Click the green **Generate new token** button.
-6. Fill in the form:
-   - **Token name:** `docs-editor`
-   - **Expiration:** choose **No expiration** (you do this once; if the token is ever lost or
-     leaked, delete it and make a new one)
-   - **Resource owner:** select the account your team lead told you (the organization or account
-     that owns the document library — not your personal account, unless told otherwise)
-   - **Repository access:** choose **Only select repositories**, then pick the repo your team lead
-     told you (e.g. **cirdia-documentation**) from the dropdown
-7. Under **Permissions → Repository permissions**, set exactly two:
-   - **Contents:** Read and write
-   - **Pull requests:** Read and write
-   - Leave everything else on "No access."
-8. Click **Generate token** at the bottom.
-9. GitHub shows the token **once** — a long string starting with `github_pat_`. Click the
-   **copy icon** next to it.
-10. **Save it in Bitwarden before anything else.** Open Bitwarden, add a new Login item named
-    `docs-editor` (put the token in the password field, and note which library it's for), and
-    save. GitHub never shows the token again — Bitwarden is your backup copy.
-11. Now open the Docs Editor app and paste the token when asked. It's stored safely in your
-    computer's keychain. (Or, if your team lead set you up with the `.env` method: open the `.env`
-    file next to the app, add a line `GITHUB_TOKEN=` followed by the token, save the file.)
+That's it. **You stay signed in from now on** — quitting the app, restarting your computer, none
+of it signs you out. If your team uses more than one document library, this one sign-in covers
+all of them.
 
-**If you paste it wrong or the app loses it:** copy it again from Bitwarden. **If it's not in
-Bitwarden either:** no problem — go back to step 4, delete the old token, and generate a new one.
+**No passwords, no keys, nothing to save:** there is no token or password to keep track of. The
+sign-in lives safely on your computer, and it can be turned off any time from your GitHub account
+(Settings → Applications) or by the team lead.
 
-**Never** paste the token into chat, email, or a shared doc. It's a password — Bitwarden and the
-app are the only two places it should ever live.
+**If the browser says the code expired:** codes are only valid for a few minutes — go back to the
+app and click the sign-in button again for a fresh one.
 
 ---
 
@@ -104,8 +84,7 @@ on the `DISPLAY_NAME` line, done.
   link to follow along.
 - Closed the app mid-edit? On next launch it offers to pick up where you left off.
 - If your team uses more than one document library, click the **library name in the bottom-left
-  corner** to switch. The first time you open a library it asks for that library's token (step 1
-  above, once per library).
+  corner** to switch. Your sign-in already covers all of them.
 - Your typed text is never lost: it's kept locally even if the app crashes or you go offline.
 
 Questions or stuck? Ask Mary.

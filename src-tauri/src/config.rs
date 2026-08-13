@@ -3,8 +3,9 @@ use std::path::PathBuf;
 
 /// The configuration keys the app understands. Only these are read from the
 /// environment and .env — nothing else leaks into the webview.
-const KEYS: [&str; 8] = [
+const KEYS: [&str; 9] = [
     "GITHUB_TOKEN",
+    "GITHUB_APP_CLIENT_ID",
     "DISPLAY_NAME",
     "REPO_OWNER",
     "REPO_NAME",

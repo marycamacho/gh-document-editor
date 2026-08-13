@@ -10,8 +10,12 @@ Full product and technical spec: [docs/spec.md](docs/spec.md). Setup guide to se
 ## Stack
 
 - **Tauri 2** desktop shell (macOS + Windows). Rust owns window management, `.env` config
-  resolution, OS-keychain storage for the GitHub token, and the **GitHub REST client** (reqwest) —
-  all network traffic runs in the Rust layer, and the token never enters the webview.
+  resolution, sign-in + token storage, and the **GitHub REST client** (reqwest) — all network
+  traffic runs in the Rust layer, and the token never enters the webview.
+- **Auth:** GitHub App ("Cirdia Docs Editor") **device flow** — users approve once in the browser
+  with a short code and stay signed in permanently (token expiration is disabled on the App).
+  The token lives in an owner-only `auth.json` in the app data dir; no keychain, no OS prompts.
+  One sign-in covers every library the App is installed on.
 - **Svelte 5 + TypeScript + CodeMirror 6** front end in the webview, with HackMD-style
   Write / Split / Preview view modes. It talks to GitHub only through typed Tauri commands.
 - **GitHub REST API** for everything git: branch, commit, PR. No local clone, no git binary.
@@ -27,10 +31,10 @@ npm run tauri:dev:docs       # cirdia-wellness/cirdia-documentation
 npm run tauri:dev:writing    # marycamacho/writing
 ```
 
-On first launch the app asks for a GitHub fine-grained PAT (Contents + Pull requests, read/write,
-scoped to the one repo) and stores it in the OS keychain. Repo configuration comes from a `.env`
-file — copy `.env.example` to `.env` next to the app (repo root in dev) and fill it in. A
-`GITHUB_TOKEN` in `.env` skips the first-run screen entirely.
+On first launch the app shows "Sign in with GitHub": a short code, approved once in the browser.
+Repo configuration comes from a `.env` file — copy `.env.example` to `.env` next to the app (repo
+root in dev) and fill it in. For dev, a `GITHUB_TOKEN` in `.env` bypasses sign-in entirely, and
+`GITHUB_APP_CLIENT_ID` overrides the baked-in App registration.
 
 ## Develop
 
@@ -55,4 +59,5 @@ parser, base64 handling, path encoding, and stale-session detection.
 | Plain-language errors (spec §8) | `src/lib/errors.ts` |
 | Draft persistence ("text is never lost") | `src/lib/localdb.ts` + autosave in `src/App.svelte` |
 | Screens (spec §7) | `src/App.svelte` + `src/components/` |
-| `.env` loading + keychain | `src-tauri/src/config.rs`, `src-tauri/src/keychain.rs` |
+| Sign-in (device flow) + token file | `src-tauri/src/auth.rs` |
+| `.env` loading | `src-tauri/src/config.rs` |

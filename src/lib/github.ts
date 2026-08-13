@@ -9,8 +9,6 @@ import type { RepoChoice, StaleSession } from "./types";
 
 export interface ConnectResult {
   login: string;
-  /** False when the keychain refused to store a newly entered token. */
-  stored: boolean;
 }
 
 /** Errors from the Rust side carry { kind, status, message }. */
@@ -23,13 +21,31 @@ const repoArgs = (r?: RepoChoice) =>
 
 export const session = {
   /**
-   * Connect to a library with its .env or keychain token; rejects with kind
-   * "no-token" when neither works. Omitting the choice uses the configured default.
+   * Connect to a library with the stored sign-in (or a .env dev token);
+   * rejects with kind "no-token" when the person needs to sign in.
+   * Omitting the choice uses the configured default library.
    */
   connect: (r?: RepoChoice) => invoke<ConnectResult>("session_connect", repoArgs(r)),
-  /** First-run (once per library): validate a pasted token, keep it in the keychain, connect. */
-  connectWithToken: (token: string, r?: RepoChoice) =>
-    invoke<ConnectResult>("session_connect_token", { token, ...repoArgs(r) }),
+};
+
+/** GitHub App device-flow sign-in. One sign-in covers every library. */
+export type PollOutcome = "pending" | "connected" | "expired" | "denied";
+
+export interface DeviceStart {
+  userCode: string;
+  verificationUri: string;
+  /** Seconds to wait between polls. */
+  interval: number;
+  expiresIn: number;
+}
+
+export const auth = {
+  /** Ask GitHub for a device code to show the person. */
+  start: () => invoke<DeviceStart>("auth_start"),
+  /** Has the person approved in the browser yet? Saves the token on "connected". */
+  poll: () => invoke<PollOutcome>("auth_poll"),
+  /** Forget the stored sign-in. */
+  signout: () => invoke<void>("auth_signout"),
 };
 
 export const gh = {

@@ -1,17 +1,20 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod auth;
 mod config;
 mod github;
-mod keychain;
 
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(github::Gh::default())
+        .manage(auth::DeviceAuth::default())
         .invoke_handler(tauri::generate_handler![
             config::load_config,
+            auth::auth_start,
+            auth::auth_poll,
+            auth::auth_signout,
             github::session_connect,
-            github::session_connect_token,
             github::gh_load_tree,
             github::gh_read_file,
             github::gh_file_sha,

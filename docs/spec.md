@@ -12,7 +12,7 @@ A minimal Tauri desktop app that lets non-technical team members edit and create
 - No local clone or local git. All operations go through the GitHub REST API.
 - No merge conflict resolution UI. If the file changed upstream mid-edit, warn and offer "save anyway to my branch" (safe — it's their branch) or discard.
 - No image upload, no file rename/delete.
-- No arbitrary multi-repo support. The config lists the available libraries (`REPO_OWNER`/`REPO_NAME` plus the optional `REPOS` list), and the footer's library name is a click-to-switch menu across them — one active library at a time, one token per library. Adding a library is a config change, not a UI flow. The two known deployments are **`cirdia-wellness/cirdia-documentation`** and **`marycamacho/writing`**.
+- No arbitrary multi-repo support. The config lists the available libraries (`REPO_OWNER`/`REPO_NAME` plus the optional `REPOS` list), and the footer's library name is a click-to-switch menu across them — one active library at a time, one sign-in covering all of them. Adding a library is a config change, not a UI flow. The two known deployments are **`cirdia-wellness/cirdia-documentation`** and **`marycamacho/writing`**.
 - No review UI. Review happens in GitHub as normal.
 
 ---
@@ -21,7 +21,8 @@ A minimal Tauri desktop app that lets non-technical team members edit and create
 
 ```
 Launch app
-  └─ Token present in .env? ──no──► First-run screen: paste token, validate, store
+  └─ Signed in? ──no──► First-run screen: name + "Sign in with GitHub"
+  │                     (device code → approve in browser → signed in for good)
   └─ yes
       ▼
 Tree view (left sidebar, like an IDE)
@@ -77,7 +78,7 @@ Edge: person closes the window after commits but before submitting
 | Merge strategy | Whatever the repo default is; multi-commit PRs are fine | — |
 
 `<file-slug>` = filename lowercased, extension dropped, non-alphanumerics → `-`.
-`<name>` comes from `DISPLAY_NAME` in `.env` (fall back to the GitHub login from the token).
+`<name>` comes from `DISPLAY_NAME` in `.env` (fall back to the signed-in GitHub login).
 Timestamps in the person's local timezone.
 
 ---
@@ -90,8 +91,8 @@ Timestamps in the person's local timezone.
 │  Svelte front end (webview)           Rust shell                     │
 │  ┌──────────────┐  ┌──────────────┐   • window, menus                │
 │  │ Tree sidebar │  │ Editor pane  │   • .env / config resolution     │
-│  │ (folders,    │  │ CodeMirror 6 │   • token in OS keychain         │
-│  │  .md files)  │  │ + preview    │     (keyring crate)              │
+│  │ (folders,    │  │ CodeMirror 6 │   • GitHub App device-flow       │
+│  │  .md files)  │  │ + preview    │     sign-in; token file (0600)   │
 │  └──────┬───────┘  └──────┬───────┘   • GitHub REST client (reqwest) │
 │         │                 │           • no git binary needed         │
 │         └── invoke (typed commands) ──► Rust ── HTTPS ──► api.github.com
@@ -99,9 +100,10 @@ Timestamps in the person's local timezone.
 ```
 
 - **Front end:** Svelte 5 + CodeMirror 6 (`@codemirror/lang-markdown`), with Write / Split / Preview view modes (`marked` + DOMPurify for the rendered side). Milkdown is an alternative if a WYSIWYG feel is wanted later; v1 ships source-with-preview.
-- **GitHub client:** in the **Rust layer** (`reqwest`), matching the pattern of every app in the ecosystem — all network traffic from Rust. The webview invokes typed Tauri commands; **the PAT stays in the Rust shell and never enters the webview** (a pasted token passes through once on first-run entry, then never comes back). Plain-language error mapping stays in the front end, keyed off the structured `{kind, status, message}` errors the Rust side returns.
-- **Rust side:** window management, config resolution, keychain, and the GitHub client. No git2, no shell-outs.
-- **State:** in-memory + webview localStorage for display name, draft buffers, and session records; the token lives only in the OS keychain (or `.env`).
+- **GitHub client:** in the **Rust layer** (`reqwest`), matching the pattern of every app in the ecosystem — all network traffic from Rust. The webview invokes typed Tauri commands; **the token never enters the webview at all** — sign-in happens Rust-side via the device flow, and the webview only ever sees the short user code. Plain-language error mapping stays in the front end, keyed off the structured `{kind, status, message}` errors the Rust side returns.
+- **Auth:** GitHub App ("Cirdia Docs Editor", Client ID baked into the build) with **device flow** — the person approves once in the browser with a short code; token expiration is disabled on the App registration, so the sign-in is permanent until revoked. The token is stored in an owner-only (0600) `auth.json` in the app data dir — no OS keychain, so no permission prompts, on any platform, dev or shipped. One sign-in covers every installed library. `GITHUB_TOKEN` in `.env` remains a dev/power-user override.
+- **Rust side:** window management, config resolution, device-flow auth + token file, and the GitHub client. No git2, no shell-outs.
+- **State:** in-memory + webview localStorage for display name, draft buffers, and session records; the token lives only in the app-data token file (or the `.env` override).
 
 ### API call map
 
@@ -115,7 +117,8 @@ Timestamps in the person's local timezone.
 | Close & Submit | `POST /repos/{o}/{r}/pulls` (head = branch, base = main) |
 | Discard branch | `DELETE /repos/{o}/{r}/git/refs/heads/{branch}` |
 | Detect stale sessions | `GET /repos/{o}/{r}/branches?protected=false` filter `docs/` + `GET /pulls?head=` |
-| Validate token (first run) | `GET /user` and `GET /repos/{o}/{r}` (checks scope + access) |
+| Sign in (first run) | `POST github.com/login/device/code`, then poll `POST github.com/login/oauth/access_token` |
+| Validate sign-in / connect | `GET /user` and `GET /repos/{o}/{r}` (checks access) |
 
 Note on `PUT /contents`: each save must send the *current* blob `sha` of the file **on the edit branch** (after the first save, use the sha returned by the previous save). This is what makes multiple commits per session work.
 
@@ -128,11 +131,10 @@ Note on `PUT /contents`: each save must send the *current* blob `sha` of the fil
 ```bash
 # ── Docs Editor configuration ──────────────────────────────
 # Copy this file to `.env` in the same folder as the app,
-# fill in the two values marked TODO, save. That's it.
-
-# Your personal access token from GitHub (see setup guide, Section 6)
-# It starts with "github_pat_"
-GITHUB_TOKEN=TODO_paste_your_token_here
+# fill in your name, save. That's it.
+#
+# Signing in happens inside the app (Sign in with GitHub) —
+# there are no tokens or passwords in this file.
 
 # Your name as it should appear in edit history (e.g. "Ana")
 DISPLAY_NAME=TODO_your_first_name
@@ -143,9 +145,12 @@ DISPLAY_NAME=TODO_your_first_name
 REPO_OWNER=cirdia-wellness
 REPO_NAME=cirdia-documentation
 DEFAULT_BRANCH=main
+
+# Optional: more libraries for the in-app switcher
+#REPOS=marycamacho/writing
 ```
 
-**Decision: the app supports both.** On launch it reads `GITHUB_TOKEN` from `.env` if present; otherwise it looks in the OS keychain; if neither has a token it shows the first-run "Paste your token" screen, validates it live (`GET /user` → shows "Hi, Ana ✓"), and stores it in the keychain. `.env` is the escape hatch (pre-provisioned setups, troubleshooting); keychain is the default path for people who set up themselves — no plaintext token on disk.
+**Auth decision (supersedes the PAT/keychain design):** sign-in is a **GitHub App device flow**. On launch the app connects with the stored sign-in; with none stored it shows the sign-in screen (name + "Sign in with GitHub" → short code → browser approval). The resulting non-expiring user token is written to an owner-only `auth.json` in the app data dir. `GITHUB_TOKEN` in `.env` survives as a dev/power-user override only — it is not part of any user's setup.
 
 ### 5.2 App config (baked in or `.env`)
 
@@ -155,44 +160,31 @@ Standard dotenv precedence: the `.env` file supplies values, and a real process 
 
 ---
 
-## 6. User Guide: Creating Your GitHub Token (include verbatim in onboarding doc)
+## 6. User Guide: Signing In (include verbatim in onboarding doc)
 
 *The standalone, hand-to-a-team-member version of §6 + §6.1 (plus a short day-to-day section) is
 maintained at [user-guide.md](user-guide.md) — that's the file to send people. Keep the two in
 sync when either changes.*
 
-> **What you're doing:** creating a personal key that lets the Docs Editor save your changes to the team's document library. Takes about 3 minutes. You do this once.
+> **Before you start:** you need a GitHub account, and the team lead must have given it access to the documents. If you can open the repo page your team lead sent you (e.g. github.com/cirdia-wellness/cirdia-documentation), you're set.
 >
-> **Before you start:** you need a GitHub account and the team lead must have added you to the repo with write access. If you can open the repo page your team lead sent you (e.g. github.com/cirdia-wellness/cirdia-documentation), you're set.
+> 1. Open the Docs Editor app.
+> 2. Type your name (this is how your edits are labeled — e.g. "Ana").
+> 3. Click **Sign in with GitHub**.
+> 4. The app shows a short code, something like `B4XR-9KQP`. Click the code to copy it.
+> 5. Click **Open GitHub in your browser**. A GitHub page appears asking for the code.
+> 6. Paste the code, click **Continue**, then click **Authorize**. (Sign in to github.com first if the browser asks you to.)
+> 7. Switch back to the Docs Editor — your documents are already loading.
 >
-> **One token per document library.** A token only works for the one library it was created for. If your team uses more than one library, repeat these steps once per library — the app asks for each one separately and remembers them all.
+> That's it. **You stay signed in from now on** — quitting the app, restarting your computer, none of it signs you out. If your team uses more than one document library, this one sign-in covers all of them.
 >
-> 1. Go to **github.com** and sign in.
-> 2. Click your **profile photo** (top-right corner) → **Settings**.
-> 3. In the left sidebar, scroll to the bottom and click **Developer settings**.
-> 4. Click **Personal access tokens** → **Fine-grained tokens**.
-> 5. Click the green **Generate new token** button.
-> 6. Fill in the form:
->    - **Token name:** `docs-editor`
->    - **Expiration:** choose **No expiration** (you do this once; if the token is ever lost or leaked, delete it and make a new one)
->    - **Resource owner:** select the account your team lead told you (the organization or account that owns the document library — not your personal account, unless told otherwise)
->    - **Repository access:** choose **Only select repositories**, then pick the repo your team lead told you (e.g. **cirdia-documentation**) from the dropdown
-> 7. Under **Permissions → Repository permissions**, set exactly two:
->    - **Contents:** Read and write
->    - **Pull requests:** Read and write
->    - Leave everything else on "No access."
-> 8. Click **Generate token** at the bottom.
-> 9. GitHub shows the token **once** — a long string starting with `github_pat_`. Click the **copy icon** next to it.
-> 10. **Save it in Bitwarden before anything else.** Open Bitwarden, add a new Login item named `docs-editor` (token in the password field, note which library it's for), save. GitHub never shows the token again — Bitwarden is your backup copy.
-> 11. Now open the Docs Editor app and paste the token when asked. (Or, if using the `.env` method: open the `.env` file next to the app, replace `TODO_paste_your_token_here` with the token, save the file.)
+> **No passwords, no keys, nothing to save:** there is no token or password to keep track of. The sign-in lives safely on your computer, and it can be turned off any time from your GitHub account (Settings → Applications) or by the team lead.
 >
-> **If you paste it wrong or the app loses it:** copy it again from Bitwarden. **If it's not in Bitwarden either:** go back to step 4, delete the old token, and generate a new one.
->
-> **Never** paste the token into chat, email, or a shared doc. It's a password — Bitwarden and the app are the only two places it should ever live.
+> **If the browser says the code expired:** codes are only valid for a few minutes — go back to the app and click the sign-in button again for a fresh one.
 
-*(Org note for Mary: fine-grained PATs scoped to an org repo may require org approval — check Settings → Third-party Access → Personal access tokens in the org, and pre-approve or set to "no approval required" so people aren't blocked at step 6.)*
+*(Infra note for Mary: the "Cirdia Docs Editor" GitHub App — owned by @marycamacho, Client ID `Iv23liW7NEzKZeoZUVa0`, baked into `src-tauri/src/auth.rs` — has device flow enabled, user-token expiration disabled, Contents + Pull requests read/write, installable on Any account, no webhook, no private key. Installed on `cirdia-wellness/cirdia-documentation` and `marycamacho/writing`. Adding a library later = install the App on that repo. Kill switches: the user revokes under Settings → Applications, or you uninstall the App from the repo.)*
 
-### 6.1 User Guide: Telling the App Which Document Library to Use (include after token guide)
+### 6.1 User Guide: Telling the App Which Document Library to Use (include after sign-in guide)
 
 > **What you're doing:** pointing the Docs Editor at the team's document library. Takes 2 minutes, once.
 >
@@ -217,13 +209,13 @@ sync when either changes.*
 >
 > **If your team lead sent you a pre-filled `.env`:** just drop it into the app folder, add your name on the `DISPLAY_NAME` line, done.
 
-*(Note for Mary: the simplest rollout is to ship each person a pre-filled `.env` with everything but `DISPLAY_NAME` set — then their entire setup is: token guide + one name field. If the keychain option is built, the token line disappears from this file entirely.)*
+*(Note for Mary: the simplest rollout is to ship each person a pre-filled `.env` with everything but `DISPLAY_NAME` set — then their entire setup is: sign in + one name field.)*
 
 ---
 
 ## 7. Screens
 
-1. **First run** — token paste + validate, display name field, "Connect" button.
+1. **First run** — display name field + "Sign in with GitHub"; then the device-code step: big click-to-copy code, "Open GitHub in your browser" button, waiting state that polls until the browser approval lands (denied/expired return to the start with a plain message).
 2. **Tree view** — sidebar of folders/files (only `.md`, only under `DOCS_ROOT`) with a **+ New document** button at top; main pane shows rendered preview of selected file; **Edit** button top-right. Small footer: connected repo + display name. When `REPOS` lists more than one library, the footer's repo name is a **click-to-switch menu**; switching reconnects with that library's own token (asking for it on first use) and is blocked mid-edit.
 2a. **New document dialog** — Title field, folder dropdown (existing folders under `DOCS_ROOT` only — no new-folder creation in v1), live filename preview, duplicate warning, Create/Cancel.
 3. **Editor** — CodeMirror source editing; toolbar: **Write / Split / Preview** view switch (HackMD-style; Split shows source and live rendered preview side by side; the choice persists across sessions), **Save**, **Close & Submit**, **Close without saving** (label switches to "Discard" and greys out after first save); dirty-state indicator; last-saved timestamp.
@@ -238,7 +230,7 @@ Design: follow the frontend-design skill / Cirdia app conventions; keep it to on
 
 | Failure | Behavior |
 |---|---|
-| Token invalid/expired (401) | Route to first-run screen with "Your token expired — here's how to make a new one" + link to guide |
+| Sign-in revoked (401) | Stored token is forgotten; route to the sign-in screen — signing in again fully recovers |
 | No repo access (404 on repo) | "Ask Mary to add you to the docs repo" message |
 | Network offline | Save button disabled with tooltip; editor buffer is preserved; retry banner |
 | File changed on main during session (409 / sha mismatch on branch — shouldn't happen; on PR it becomes a normal conflict) | PR is still created; note in PR body "may need conflict resolution" |
@@ -251,8 +243,8 @@ Principle: the person's typed text is never lost. The buffer persists to local s
 
 ## 9. Build Plan (suggested order)
 
-1. Tauri scaffold + Svelte + env/config loading + keychain storage — ½ day
-2. Token validation + first-run screen — small
+1. Tauri scaffold + Svelte + env/config loading + token storage — ½ day
+2. Device-flow sign-in + first-run screen — small
 3. Tree fetch + render + file preview — ½ day
 4. Editor pane (CodeMirror + preview) — ½ day
 5. Branch-create / save / PR / discard flow with the API call map above — ½ day
@@ -267,8 +259,8 @@ Roughly 2–3 focused days end to end.
 
 ## 10. Decisions (resolved 2026-08-13)
 
-- [x] **Token storage: both.** `.env` if present, else keychain, else first-run paste screen → keychain (see §5.1). Keychain entries are **per repo** (`owner/repo`): a fine-grained PAT is scoped to a single resource owner, and the two target repos have different owners — so a person using both libraries creates one token per library, and the app keeps each under its own entry.
+- [x] ~~**Token storage: both.** `.env` / keychain / per-repo keychain entries.~~ **Superseded 2026-08-13 (same day, after live testing):** the PAT + keychain design is replaced by **GitHub App device-flow sign-in** (§5.1, §6). Reasons: macOS keychain ACL password prompts (unfixable for unsigned dev builds), the PAT-creation burden on non-technical users, and fine-grained PATs being scoped to a single resource owner while the two libraries have different owners. The GitHub App gives one browser sign-in, non-expiring tokens (expiration disabled on the registration, matching the low-risk write-only-docs threat model), one sign-in covering all libraries, and a plain owner-only token file with zero OS prompts.
 - [x] **Target repos:** `cirdia-wellness/cirdia-documentation` and `marycamacho/writing` — one repo per install via config. `DOCS_ROOT`: whole repo (both repos hold markdown throughout, not under a single `/docs` folder).
 - [x] **Build targets:** Tauri desktop for both macOS and Windows.
 - [x] **PR reviewer:** none requested by the app. Review assignment is left to repo defaults/CODEOWNERS.
-- [x] **Token expiration: no expiration.** Guide (§6) written accordingly; a lost or leaked token is handled by deleting it and generating a new one.
+- [x] **Token expiration: no expiration.** Now enforced structurally: user-token expiration is disabled on the GitHub App registration. Revocation (user's GitHub settings, or uninstalling the App) is the recovery path for a lost machine.

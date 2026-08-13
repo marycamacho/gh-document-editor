@@ -49,9 +49,11 @@ doesn't meet it, **say so** — don't quietly build on it. Full statement: the
 1. **Typed text is never lost.** The buffer persists to local storage on a keystroke debounce;
    errors never discard it; a crash recovers it. Any change that could drop a user's words is a
    bug regardless of what else it fixes.
-2. **The token is a secret.** OS keychain by preference; never logged, never in a shipped file,
-   never in git, never shown back in the UI after entry — and **never in the webview**: a pasted
-   token passes through once on first-run entry, then only the Rust shell holds it.
+2. **Auth is GitHub App device flow; the token is a secret the user never handles.** Sign-in is a
+   browser approval with a short code — no PATs, no keychain (its ACL prompts are why it was
+   removed). The non-expiring user token lives in an owner-only file in the app data dir, held by
+   the Rust shell only — never logged, never in git, and **never in the webview** (the webview
+   sees only the device code).
 3. **All git operations go through the GitHub REST API, from the Rust layer.** No git2, no
    shell-outs, no local clone. The webview talks to GitHub only via the typed Tauri commands in
    `src-tauri/src/github.rs`.

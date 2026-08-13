@@ -101,12 +101,10 @@
       const result = await ghAuth.connect(currentRepo!);
       await afterConnect(result.login);
     } catch (e) {
+      // "no-token" (including a revoked sign-in) lands on the sign-in screen
+      // with no error; anything else shows its plain-language message there.
       if (!isNoTokenError(e)) {
-        const friendly = toFriendlyError(e);
-        firstRunError =
-          friendly.kind === "auth"
-            ? "Your saved token isn't working anymore — it may have expired or been revoked. Paste a fresh one here."
-            : friendly.message;
+        firstRunError = toFriendlyError(e).message;
       }
       screen = "first-run";
     }
@@ -131,15 +129,13 @@
     await connectCurrent();
   }
 
-  async function connectWithToken(token: string, typedName: string): Promise<void> {
+  // The sign-in screen reports the browser approval finished; the token file
+  // now exists, so a normal connect completes the flow.
+  async function handleSignedIn(typedName: string): Promise<void> {
     connecting = true;
     firstRunError = "";
     try {
-      const result = await ghAuth.connectWithToken(token, currentRepo ?? undefined);
-      if (!result.stored) {
-        // Keychain refused — the session still works; the person re-enters next launch.
-        toast("Couldn't store the token in your keychain — you may be asked again next time.", "error");
-      }
+      const result = await ghAuth.connect(currentRepo!);
       await afterConnect(result.login, typedName);
     } catch (e) {
       firstRunError = toFriendlyError(e).message;
@@ -509,7 +505,7 @@
       initialName={config?.displayName || storage.getItem("displayName") || ""}
       errorMessage={firstRunError}
       {connecting}
-      onconnect={(token, name) => void connectWithToken(token, name)}
+      onsignedin={(name) => void handleSignedIn(name)}
     />
   {:else if screen === "tree"}
     <div class="split">
