@@ -3,5 +3,9 @@
   "identifier": "default",
   "description": "Main window: core APIs plus opening the PR link in the browser.",
   "windows": ["main"],
-  "permissions": ["core:default", "opener:default"]
+  "permissions": [
+    "core:default",
+    "core:window:allow-destroy",
+    "opener:default"
+  ]
 }
