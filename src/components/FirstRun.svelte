@@ -1,4 +1,9 @@
 <script lang="ts">
+  import Modal from "./Modal.svelte";
+  import { renderMarkdown } from "../lib/markdown";
+  // The setup guide ships inside the app so the link works before any access exists.
+  import guideSource from "../../docs/user-guide.md?raw";
+
   let {
     repoLabel,
     initialName,
@@ -16,6 +21,7 @@
   let token = $state("");
   // svelte-ignore state_referenced_locally — seed once; the field is the person's to edit after that
   let name = $state(initialName);
+  let showGuide = $state(false);
 
   const canConnect = $derived(token.trim().length > 0 && name.trim().length > 0 && !connecting);
 
@@ -45,8 +51,16 @@
         spellcheck="false"
       />
       <p class="hint">
-        From the setup guide your team lead sent you. It's stored safely in your computer's keychain
-        — never in a file.
+        Don't have a token yet?
+        <button type="button" class="link" onclick={() => (showGuide = true)}>
+          Open the step-by-step setup guide</button>
+        — it walks you through every click, takes about 3 minutes.
+      </p>
+      <p class="hint">
+        Already know your way around tokens? Fine-grained, <strong>this repo only</strong>, two
+        repository permissions: <strong>Contents: Read and write</strong> and
+        <strong>Pull requests: Read and write</strong> — everything else "No access". Either way
+        it's stored safely in your computer's keychain — never in a file.
       </p>
     </div>
 
@@ -61,6 +75,18 @@
     </button>
   </form>
 </div>
+
+{#if showGuide}
+  <Modal title="Setup guide">
+    <div class="guide markdown-body">
+      <!-- sanitized in renderMarkdown -->
+      {@html renderMarkdown(guideSource)}
+    </div>
+    <div class="guide-close">
+      <button class="primary" onclick={() => (showGuide = false)}>Done</button>
+    </div>
+  </Modal>
+{/if}
 
 <style>
   .wrap {
@@ -89,8 +115,33 @@
     margin: 0 0 18px;
   }
 
-  button {
+  button[type="submit"] {
     width: 100%;
     margin-top: 6px;
+  }
+
+  .link {
+    border: none;
+    background: none;
+    padding: 0;
+    color: var(--accent);
+    text-decoration: underline;
+    font-size: inherit;
+    cursor: pointer;
+  }
+
+  .link:hover {
+    background: none;
+    color: var(--accent-hover);
+  }
+
+  .guide {
+    font-size: 14px;
+  }
+
+  .guide-close {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 14px;
   }
 </style>

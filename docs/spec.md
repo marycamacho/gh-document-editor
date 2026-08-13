@@ -157,6 +157,10 @@ Standard dotenv precedence: the `.env` file supplies values, and a real process 
 
 ## 6. User Guide: Creating Your GitHub Token (include verbatim in onboarding doc)
 
+*The standalone, hand-to-a-team-member version of §6 + §6.1 (plus a short day-to-day section) is
+maintained at [user-guide.md](user-guide.md) — that's the file to send people. Keep the two in
+sync when either changes.*
+
 > **What you're doing:** creating a personal key that lets the Docs Editor save your changes to the team's document library. Takes about 3 minutes. You do this once.
 >
 > **Before you start:** you need a GitHub account and the team lead must have added you to the repo with write access. If you can open the repo page your team lead sent you (e.g. github.com/cirdia-wellness/cirdia-documentation), you're set.

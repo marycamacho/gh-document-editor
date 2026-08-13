@@ -4,8 +4,8 @@ A small Tauri desktop app that lets non-technical team members edit and create m
 GitHub repo. Every edit lands on its own auto-created branch and arrives as a pull request — the
 person never sees git.
 
-Full product and technical spec: [docs/spec.md](docs/spec.md). Agent working rules:
-[AGENTS.md](AGENTS.md).
+Full product and technical spec: [docs/spec.md](docs/spec.md). Setup guide to send team members:
+[docs/user-guide.md](docs/user-guide.md). Agent working rules: [AGENTS.md](AGENTS.md).
 
 ## Stack
 
