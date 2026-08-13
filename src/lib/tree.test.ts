@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTree, folderPaths, isDuplicatePath, joinPath } from "./tree";
+import { buildTree, filterPaths, folderPaths, isDuplicatePath, joinPath } from "./tree";
 
 const paths = [
   "README.md",
@@ -31,6 +31,23 @@ describe("buildTree", () => {
 describe("folderPaths", () => {
   it("includes the root and every intermediate folder", () => {
     expect(folderPaths(paths)).toEqual(["", "Brand", "Company", "Company/Policies"]);
+  });
+});
+
+describe("filterPaths", () => {
+  it("matches case-insensitively on any path segment", () => {
+    expect(filterPaths(paths, "VOICE")).toEqual(["Brand/voice.md"]);
+    expect(filterPaths(paths, "polic")).toEqual(["Company/Policies/leave.md"]);
+    expect(filterPaths(paths, "company")).toEqual(["Company/onboarding.md", "Company/Policies/leave.md"]);
+  });
+
+  it("returns everything for an empty or whitespace query", () => {
+    expect(filterPaths(paths, "")).toEqual(paths);
+    expect(filterPaths(paths, "   ")).toEqual(paths);
+  });
+
+  it("returns nothing when nothing matches", () => {
+    expect(filterPaths(paths, "zzz")).toEqual([]);
   });
 });
 

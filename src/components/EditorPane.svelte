@@ -2,6 +2,7 @@
   import { EditorView, basicSetup } from "codemirror";
   import { markdown } from "@codemirror/lang-markdown";
   import { languages } from "@codemirror/language-data";
+  import { search, openSearchPanel } from "@codemirror/search";
   import { renderMarkdown } from "../lib/markdown";
   import { humanStamp } from "../lib/naming";
 
@@ -84,6 +85,7 @@
       doc: initialContent,
       extensions: [
         basicSetup,
+        search({ top: true }),
         markdown({ codeLanguages: languages }),
         EditorView.lineWrapping,
         EditorView.updateListener.of((update) => {
@@ -106,10 +108,23 @@
     };
   });
 
+  function openFind() {
+    if (!view) return;
+    // Search lives in the source editor; make sure it's on screen first.
+    if (viewMode === "preview") setMode("split");
+    openSearchPanel(view);
+  }
+
   function onkeydown(e: KeyboardEvent) {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
       e.preventDefault();
       if (dirty && online && !busy) onsave();
+    }
+    // CodeMirror handles Mod-F when focused; catch it app-wide so Find works
+    // from the preview too.
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "f" && !e.shiftKey && !e.altKey) {
+      e.preventDefault();
+      openFind();
     }
   }
 
@@ -130,6 +145,7 @@
       {#if lastSavedAt}
         <span class="saved-at">Saved {humanStamp(lastSavedAt)}</span>
       {/if}
+      <button class="quiet" title="Find in document (⌘F / Ctrl+F)" onclick={openFind}>Find</button>
       <div class="segmented" role="group" aria-label="View mode">
         {#each MODES as mode (mode.id)}
           <button
@@ -270,6 +286,76 @@
   .editor :global(.cm-scroller) {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     line-height: 1.55;
+  }
+
+  /* Search panel, restyled to match the app */
+  .editor :global(.cm-panels) {
+    background: var(--bg-subtle);
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+  }
+
+  .editor :global(.cm-panel.cm-search) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 13px;
+  }
+
+  .editor :global(.cm-panel.cm-search input) {
+    font: inherit;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 8px;
+    background: var(--bg);
+    width: auto;
+  }
+
+  .editor :global(.cm-panel.cm-search input:focus) {
+    outline: 2px solid var(--accent);
+    outline-offset: -1px;
+  }
+
+  .editor :global(.cm-panel.cm-search button) {
+    font: inherit;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    background: var(--bg);
+    color: var(--text);
+    cursor: pointer;
+    background-image: none;
+  }
+
+  .editor :global(.cm-panel.cm-search button:hover) {
+    background: var(--accent-soft);
+  }
+
+  .editor :global(.cm-panel.cm-search label) {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .editor :global(.cm-panel.cm-search [name="close"]) {
+    border: none;
+    background: none;
+    font-size: 16px;
+    color: var(--text-muted);
+    margin-left: auto;
+  }
+
+  .editor :global(.cm-searchMatch) {
+    background: rgba(15, 118, 110, 0.2);
+  }
+
+  .editor :global(.cm-searchMatch-selected) {
+    background: rgba(15, 118, 110, 0.45);
   }
 
   .preview {

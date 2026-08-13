@@ -46,6 +46,13 @@ export function folderPaths(paths: string[]): string[] {
   return [...folders].sort((a, b) => a.localeCompare(b));
 }
 
+/** Case-insensitive substring filter over paths; folder names match too. */
+export function filterPaths(paths: string[], query: string): string[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return paths;
+  return paths.filter((p) => p.toLowerCase().includes(q));
+}
+
 /** Case-insensitive duplicate check for a candidate path against existing files. */
 export function isDuplicatePath(candidate: string, existing: string[]): boolean {
   const lower = candidate.toLowerCase();

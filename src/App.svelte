@@ -13,7 +13,7 @@
   import { gh, session as ghAuth, isNoTokenError } from "./lib/github";
   import { toFriendlyError } from "./lib/errors";
   import { renderMarkdown } from "./lib/markdown";
-  import { buildTree, folderPaths, joinPath } from "./lib/tree";
+  import { folderPaths, joinPath } from "./lib/tree";
   import {
     commitMessage,
     editBranchName,
@@ -41,7 +41,6 @@
 
   // Tree screen
   let files = $state<string[]>([]);
-  const treeNodes = $derived(buildTree(files));
   const folders = $derived(folderPaths(files));
   let selectedPath = $state<string | null>(null);
   let previewHtml = $state("");
@@ -510,7 +509,7 @@
   {:else if screen === "tree"}
     <div class="split">
       <Sidebar
-        nodes={treeNodes}
+        {files}
         {selectedPath}
         onselect={(p) => void selectFile(p)}
         onnew={() => (showNewDialog = true)}

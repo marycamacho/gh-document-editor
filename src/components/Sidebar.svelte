@@ -1,30 +1,44 @@
 <script lang="ts">
-  import type { TreeNode } from "../lib/types";
+  import { buildTree, filterPaths } from "../lib/tree";
   import TreeItem from "./TreeItem.svelte";
 
   let {
-    nodes,
+    files,
     selectedPath,
     onselect,
     onnew,
   }: {
-    nodes: TreeNode[];
+    files: string[];
     selectedPath: string | null;
     onselect: (path: string) => void;
     onnew: () => void;
   } = $props();
+
+  let filter = $state("");
+
+  const filtering = $derived(filter.trim().length > 0);
+  const nodes = $derived(buildTree(filterPaths(files, filter)));
 </script>
 
 <aside>
   <div class="top">
     <button class="primary new-doc" onclick={onnew}>+ New document</button>
+    <input
+      class="filter"
+      type="search"
+      placeholder="Find a document…"
+      bind:value={filter}
+      spellcheck="false"
+    />
   </div>
   <nav>
     {#if nodes.length === 0}
-      <p class="empty">No documents found.</p>
+      <p class="empty">
+        {filtering ? "No documents match." : "No documents found."}
+      </p>
     {:else}
       {#each nodes as node (node.path)}
-        <TreeItem {node} depth={0} {selectedPath} {onselect} />
+        <TreeItem {node} depth={0} {selectedPath} forceOpen={filtering} {onselect} />
       {/each}
     {/if}
   </nav>
@@ -43,10 +57,18 @@
   .top {
     padding: 12px;
     border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
   }
 
   .new-doc {
     width: 100%;
+  }
+
+  .filter {
+    font-size: 13px;
+    padding: 6px 9px;
   }
 
   nav {
