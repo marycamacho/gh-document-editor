@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import { EditorView, basicSetup } from "codemirror";
   import { markdown } from "@codemirror/lang-markdown";
   import { languages } from "@codemirror/language-data";
@@ -64,25 +65,30 @@
   const previewHtml = $derived(showPreview ? renderMarkdown(current) : "");
   const busy = $derived(saving || submitting);
 
-  // Split mode: keep the two panes at the same proportional position, in both
-  // directions. The guard stops the panes from ping-ponging each other.
-  let syncing = false;
+  // Split mode: the pane the person is actually interacting with drives the
+  // other one. One-directional by construction — the driven pane's own scroll
+  // events are ignored, so there is no feedback loop to guard against.
+  let activePane: "editor" | "preview" = "editor";
 
   function syncScroll(source: HTMLElement, target: HTMLElement) {
-    if (syncing) return;
-    syncing = true;
     const ratio = source.scrollTop / Math.max(1, source.scrollHeight - source.clientHeight);
     target.scrollTop = ratio * (target.scrollHeight - target.clientHeight);
-    requestAnimationFrame(() => (syncing = false));
   }
 
   function onPreviewScroll() {
-    if (viewMode === "split" && view && previewEl) syncScroll(previewEl, view.scrollDOM);
+    if (activePane === "preview" && viewMode === "split" && view && previewEl) {
+      syncScroll(previewEl, view.scrollDOM);
+    }
   }
 
   $effect(() => {
+    // untrack: this effect must run exactly once per mounted session. The
+    // buffer flows back into `initialContent` on every keystroke, and a
+    // tracked read here would rebuild the editor per keypress — cursor and
+    // scroll snapping to the top of the document (the v0.1.1 editing bug).
+    const doc = untrack(() => initialContent);
     const v = new EditorView({
-      doc: initialContent,
+      doc,
       extensions: [
         basicSetup,
         search({ top: true }),
@@ -99,8 +105,13 @@
     });
     view = v;
     v.scrollDOM.addEventListener("scroll", () => {
-      if (viewMode === "split" && previewEl) syncScroll(v.scrollDOM, previewEl);
+      if (activePane === "editor" && untrack(() => viewMode) === "split" && previewEl) {
+        syncScroll(v.scrollDOM, previewEl);
+      }
     });
+    // Interacting with the editor (pointer or keyboard) makes it the driver.
+    v.scrollDOM.addEventListener("pointerenter", () => (activePane = "editor"));
+    v.dom.addEventListener("focusin", () => (activePane = "editor"));
     v.focus();
     return () => {
       view = undefined;
@@ -181,7 +192,13 @@
     <!-- CodeMirror stays mounted across mode switches so the buffer and cursor survive. -->
     <div class="editor" class:with-preview={viewMode === "split"} bind:this={editorEl} hidden={!showEditor}></div>
     {#if showPreview}
-      <div class="preview" bind:this={previewEl} onscroll={onPreviewScroll}>
+      <!-- svelte-ignore a11y_no_static_element_interactions — pointerenter only picks the scroll-sync driver; not an interactive control -->
+      <div
+        class="preview"
+        bind:this={previewEl}
+        onscroll={onPreviewScroll}
+        onpointerenter={() => (activePane = "preview")}
+      >
         <!-- sanitized in renderMarkdown -->
         <div class="markdown-body">{@html previewHtml}</div>
       </div>
