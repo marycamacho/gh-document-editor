@@ -1,0 +1,41 @@
+{
+  "name": "gh-document-editor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev --port 1420",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:all": "npm run test:run && cd src-tauri && cargo test",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:dev:docs": "REPO_OWNER=cirdia-wellness REPO_NAME=cirdia-documentation DEFAULT_BRANCH=main tauri dev",
+    "tauri:dev:writing": "REPO_OWNER=marycamacho REPO_NAME=writing DEFAULT_BRANCH=main tauri dev",
+    "tauri:build": "tauri build"
+  },
+  "dependencies": {
+    "@codemirror/lang-markdown": "^6.3.0",
+    "@codemirror/language-data": "^6.5.0",
+    "@tauri-apps/api": "~2.10.0",
+    "@tauri-apps/plugin-opener": "^2.5.0",
+    "codemirror": "^6.0.1",
+    "dompurify": "^3.2.4",
+    "marked": "^15.0.6",
+    "svelte": "^5.46.1"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^6.2.1",
+    "@tauri-apps/cli": "^2.9.6",
+    "@tsconfig/svelte": "^5.0.4",
+    "@types/node": "^22.10.2",
+    "svelte-check": "^4.0.0",
+    "tslib": "^2.8.1",
+    "typescript": "^5.7.2",
+    "vite": "^7.3.0",
+    "vitest": "^4.0.16"
+  }
+}

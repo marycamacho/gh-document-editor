@@ -38,7 +38,8 @@ Tree view (left sidebar, like an IDE)
       ▼
 [Edit] button
   • App creates branch: docs/<file-slug>-<YYYYMMDD-HHmm>
-  • Editor pane opens (markdown source + live preview toggle)
+  • Editor pane opens (markdown source, with HackMD-style Write / Split /
+    Preview view modes — Split shows source and rendered preview side by side)
       ▼
 [Save] button (can be pressed many times)
   • Commits current buffer to the branch
@@ -84,23 +85,23 @@ Timestamps in the person's local timezone.
 ## 4. Architecture
 
 ```
-┌──────────────────────────── Tauri app ────────────────────────────┐
-│                                                                    │
-│  Svelte front end                     Rust shell (thin)            │
-│  ┌──────────────┐  ┌──────────────┐   • window, menus              │
-│  │ Tree sidebar │  │ Editor pane  │   • secure storage for token   │
-│  │ (folders,    │  │ CodeMirror 6 │     (tauri-plugin-store or OS  │
-│  │  .md files)  │  │ + md preview │      keychain via keyring)     │
-│  └──────┬───────┘  └──────┬───────┘   • no git binary needed       │
-│         │                 │                                        │
-│         └───── Octokit (REST) ─── HTTPS ──► api.github.com         │
-└────────────────────────────────────────────────────────────────────┘
+┌───────────────────────────── Tauri app ─────────────────────────────┐
+│                                                                      │
+│  Svelte front end (webview)           Rust shell                     │
+│  ┌──────────────┐  ┌──────────────┐   • window, menus                │
+│  │ Tree sidebar │  │ Editor pane  │   • .env / config resolution     │
+│  │ (folders,    │  │ CodeMirror 6 │   • token in OS keychain         │
+│  │  .md files)  │  │ + preview    │     (keyring crate)              │
+│  └──────┬───────┘  └──────┬───────┘   • GitHub REST client (reqwest) │
+│         │                 │           • no git binary needed         │
+│         └── invoke (typed commands) ──► Rust ── HTTPS ──► api.github.com
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Front end:** Svelte + CodeMirror 6 (`@codemirror/lang-markdown`) with a rendered-preview toggle (`marked` or `markdown-it`). Milkdown is an alternative if a WYSIWYG feel is wanted later; v1 ships source-with-preview.
-- **GitHub client:** `@octokit/rest` running in the webview. All calls carry the PAT.
-- **Rust side:** only window management and secret storage. No git2, no shell-outs.
-- **State:** in-memory + a small persisted store (`tauri-plugin-store`) for: repo config, token (or keychain reference), display name, unfinished-session branch names.
+- **Front end:** Svelte 5 + CodeMirror 6 (`@codemirror/lang-markdown`), with Write / Split / Preview view modes (`marked` + DOMPurify for the rendered side). Milkdown is an alternative if a WYSIWYG feel is wanted later; v1 ships source-with-preview.
+- **GitHub client:** in the **Rust layer** (`reqwest`), matching the pattern of every app in the ecosystem — all network traffic from Rust. The webview invokes typed Tauri commands; **the PAT stays in the Rust shell and never enters the webview** (a pasted token passes through once on first-run entry, then never comes back). Plain-language error mapping stays in the front end, keyed off the structured `{kind, status, message}` errors the Rust side returns.
+- **Rust side:** window management, config resolution, keychain, and the GitHub client. No git2, no shell-outs.
+- **State:** in-memory + webview localStorage for display name, draft buffers, and session records; the token lives only in the OS keychain (or `.env`).
 
 ### API call map
 
@@ -149,6 +150,8 @@ DEFAULT_BRANCH=main
 ### 5.2 App config (baked in or `.env`)
 
 `REPO_OWNER`, `REPO_NAME`, `DEFAULT_BRANCH`, optional `DOCS_ROOT` (e.g. only show the `/docs` folder), optional `BRANCH_PREFIX` (default `docs/`).
+
+Standard dotenv precedence: the `.env` file supplies values, and a real process env var overrides it. That's what the dev conveniences ride on — `npm run tauri:dev:docs` and `npm run tauri:dev:writing` launch against `cirdia-wellness/cirdia-documentation` and `marycamacho/writing` without touching the `.env`.
 
 ---
 
@@ -216,7 +219,7 @@ DEFAULT_BRANCH=main
 1. **First run** — token paste + validate, display name field, "Connect" button.
 2. **Tree view** — sidebar of folders/files (only `.md`, only under `DOCS_ROOT`) with a **+ New document** button at top; main pane shows rendered preview of selected file; **Edit** button top-right. Small footer: connected repo + display name.
 2a. **New document dialog** — Title field, folder dropdown (existing folders under `DOCS_ROOT` only — no new-folder creation in v1), live filename preview, duplicate warning, Create/Cancel.
-3. **Editor** — CodeMirror source editing; toolbar: preview toggle, **Save**, **Close & Submit**, **Close without saving** (label switches to "Discard" and greys out after first save); dirty-state indicator; last-saved timestamp.
+3. **Editor** — CodeMirror source editing; toolbar: **Write / Split / Preview** view switch (HackMD-style; Split shows source and live rendered preview side by side; the choice persists across sessions), **Save**, **Close & Submit**, **Close without saving** (label switches to "Discard" and greys out after first save); dirty-state indicator; last-saved timestamp.
 4. **Submitted** — checkmark, PR link, "Back to documents" button.
 5. **Resume prompt** — appears on launch if unsubmitted `docs/*` branches by this user exist.
 

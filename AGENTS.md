@@ -7,8 +7,9 @@ the Cirdia documentation hub when a rule's full statement lives there.*
 
 A minimal **Tauri desktop app** that lets non-technical team members edit and create markdown docs
 in a GitHub repo. Every edit lands on its own auto-created branch and arrives as a pull request;
-the person never sees git. Svelte + CodeMirror front end, thin Rust shell, all repo operations
-through the GitHub REST API — no local clone, no git binary.
+the person never sees git. Svelte + CodeMirror front end; the Rust shell owns config resolution,
+the keychain, and the GitHub REST client — all network traffic from the Rust layer, the ecosystem
+pattern. No local clone, no git binary.
 
 **The spec is the source of truth for behavior:** [docs/spec.md](docs/spec.md). When behavior
 changes, the spec moves in the same change. The open decisions in spec §10 are Mary's calls — ask,
@@ -49,9 +50,11 @@ doesn't meet it, **say so** — don't quietly build on it. Full statement: the
    errors never discard it; a crash recovers it. Any change that could drop a user's words is a
    bug regardless of what else it fixes.
 2. **The token is a secret.** OS keychain by preference; never logged, never in a shipped file,
-   never in git, never shown back in the UI after entry.
-3. **All git operations go through the GitHub REST API.** No git2, no shell-outs, no local clone.
-   The Rust side is window management and secret storage only.
+   never in git, never shown back in the UI after entry — and **never in the webview**: a pasted
+   token passes through once on first-run entry, then only the Rust shell holds it.
+3. **All git operations go through the GitHub REST API, from the Rust layer.** No git2, no
+   shell-outs, no local clone. The webview talks to GitHub only via the typed Tauri commands in
+   `src-tauri/src/github.rs`.
 4. **Errors speak the user's language.** Every failure state maps to a plain-language message with
    a next step (spec §8). A raw API error reaching the screen is a defect.
 5. **Stay parameterized.** `owner`/`repo` come from config everywhere. Multi-repo is v2; hardcoding
